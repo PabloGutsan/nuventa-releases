@@ -1,0 +1,35 @@
+﻿name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm install
+      - name: Build and publish Mac
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npm run publish:mac
+
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm install
+      - name: Build and publish Windows
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npm run publish:win
