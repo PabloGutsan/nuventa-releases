@@ -17,6 +17,8 @@ jobs:
         run: pip3 install setuptools --break-system-packages
       - name: Install dependencies
         run: npm install
+      - name: Upgrade better-sqlite3
+        run: npm install better-sqlite3@latest --save
       - name: Build and publish Mac
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -31,6 +33,8 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
+      - name: Upgrade better-sqlite3
+        run: npm install better-sqlite3@latest --save
       - name: Build and publish Windows
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
