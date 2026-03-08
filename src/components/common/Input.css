@@ -1,0 +1,137 @@
+/* ============================================================================
+   Input Component — src/components/common/Input.css
+   ============================================================================ */
+
+.input-wrapper {
+    margin-bottom: 16px;
+}
+
+.input-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    color: #374151;
+}
+
+.input-required {
+    color: #ef4444;
+    margin-left: 4px;
+}
+
+.input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    transition: border-color 0.2s ease;
+}
+
+.input-container:focus-within {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input-container.input-error {
+    border-color: #ef4444;
+}
+
+/* Icono izquierdo */
+.input-icon {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    color: #6b7280;
+    flex-shrink: 0;
+}
+
+/* Campo de texto */
+.input-field {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    outline: none;
+    font-size: 16px;
+    background: transparent;
+    font-family: inherit;
+    min-width: 0;
+}
+
+.input-field:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+}
+
+/* Icono derecho — para botón ojo u otros */
+.input-right-icon {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    flex-shrink: 0;
+}
+
+.input-right-icon button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: #9ca3af;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: color 0.15s, background 0.15s;
+    padding: 0;
+    font-family: inherit;
+}
+
+.input-right-icon button:hover {
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+/* Mensajes */
+.input-error-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    color: #ef4444;
+}
+
+.input-helper-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+/* Icono derecho - botón ojo y similares */
+.input-right-icon {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    flex-shrink: 0;
+}
+
+.input-right-icon button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: #9ca3af;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: color 0.15s, background 0.15s;
+    padding: 0;
+}
+
+.input-right-icon button:hover {
+    color: #2563eb;
+    background: #eff6ff;
+}

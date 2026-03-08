@@ -1,0 +1,156 @@
+@import '@fontsource/poppins/latin-400.css';
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-600.css';
+@import '@fontsource/poppins/latin-700.css';
+@import './styles/variables.css';
+
+/* Reset base */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Aplicar Poppins a TODO el sistema */
+html, body, #root {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);   /* 14px — base adecuada para Poppins */
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--gray-800);
+    background-color: var(--gray-100);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Mejora el renderizado de Poppins en pantallas de baja resolución */
+    text-rendering: optimizeLegibility;
+}
+
+/* Heredar fuente en todos los elementos de formulario */
+input, select, textarea, button {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* Scrollbar global */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
+}
+
+/* Layout principal */
+.main-content-scrollable {
+    height: 100%;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+/* Page header — patrón común en todos los módulos */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.page-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 4px 0;
+    letter-spacing: -0.02em;   /* Poppins se ve mejor con tracking negativo en títulos */
+}
+
+.page-subtitle {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin: 0;
+    font-weight: 400;
+}
+
+/* Botones de exportar — patrón reutilizable */
+.rp-btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.rp-btn-excel {
+    background-color: #16a34a;
+    color: #fff;
+}
+
+.rp-btn-excel:hover:not(:disabled) {
+    background-color: #15803d;
+}
+
+.rp-btn-pdf {
+    background-color: #dc2626;
+    color: #fff;
+}
+
+.rp-btn-pdf:hover:not(:disabled) {
+    background-color: #b91c1c;
+}
+
+.rp-btn-export:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.rp-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.rp-refresh:hover:not(:disabled) {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+}
+
+.rp-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.spin {
+    animation: spinIcon 0.8s linear infinite;
+}
+
+@keyframes spinIcon {
+    to { transform: rotate(360deg); }
+}

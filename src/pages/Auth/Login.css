@@ -1,0 +1,212 @@
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
+    padding: 20px;
+}
+
+.login-box {
+    width: 100%;
+    max-width: 420px;
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+    color: white;
+}
+
+.login-logo {
+    font-size: 64px;
+    margin-bottom: 16px;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-10px); }
+}
+
+.login-header h1 {
+    margin: 0 0 8px 0;
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.login-header p {
+    margin: 0;
+    font-size: 18px;
+    opacity: 0.9;
+}
+
+.login-form {
+    padding: 10px 0;
+}
+
+.login-info {
+    margin-top: 20px;
+    padding: 16px;
+    background-color: var(--gray-50);
+    border-radius: var(--radius-md);
+    text-align: center;
+}
+
+.login-info small {
+    color: var(--gray-600);
+    line-height: 1.6;
+}
+
+.login-footer {
+    margin-top: 24px;
+    text-align: center;
+    color: white;
+    opacity: 0.8;
+}
+
+.login-footer small {
+    font-size: 14px;
+}
+
+/* ── Botón ¿Olvidaste tu contraseña? ─────────────────────────────────────── */
+.login-recover-link {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 8px 0 0;
+    text-align: center;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.login-recover-link:hover {
+    color: var(--primary-500);
+    text-decoration: underline;
+}
+
+/* ── Recuperación de contraseña ─────────────────────────────────────────── */
+.recover-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.recover-email-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+}
+
+.recover-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1E1B4B;
+    margin: 0 0 6px 0;
+}
+
+.recover-sub {
+    font-size: 13px;
+    color: #6B7280;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.recover-error {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #DC2626;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+.recover-success {
+    text-align: center;
+    padding: 16px 0 24px;
+}
+
+/* ── Toggle ver/ocultar contraseña ──────────────────────────────────────── */
+.recover-pass-field {
+    position: relative;
+}
+
+.recover-eye {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px;
+    line-height: 1;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.recover-eye:hover {
+    opacity: 1;
+}
+
+.recover-success__check {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #D1FAE5;
+    color: #059669;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+/* ── Nota de recuperación para usuarios no-admin ── */
+.login-recover-note {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 8px;
+    line-height: 1.5;
+    max-width: 280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 8px 12px;
+    background: #f8f9ff;
+    border-radius: 8px;
+    border: 1px solid #e0e7ff;
+}
+
+/* ── Nota de recuperación para usuarios no-admin ── */
+.login-recover-note {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 8px;
+    line-height: 1.5;
+    max-width: 280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 8px 12px;
+    background: #f8f9ff;
+    border-radius: 8px;
+    border: 1px solid #e0e7ff;
+}
+
+
+/* ── Brand title login ── */
+.login-brand {
+    font-size: 72px !important;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: -1px;
+    margin: 0 0 6px 0;
+    line-height: 1;
+}
+
+.login-brand-v {
+    color: #F97316;
+}

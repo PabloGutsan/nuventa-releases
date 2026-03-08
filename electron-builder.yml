@@ -1,0 +1,103 @@
+appId: com.nuventa.pos
+productName: Nuventa
+copyright: "Copyright © 2026 Redinvierte SpA"
+
+# ── Archivos a incluir en el build ────────────────────────────────────────────
+files:
+  - build/**/*
+  - public/electron.js
+  - public/preload.js
+  - public/licenseManager.js
+  - database/**/*
+  - node_modules/**/*
+  - package.json
+
+directories:
+  buildResources: assets
+  output: dist
+
+extraResources:
+  - from: database/
+    to: database
+    filter:
+      - "**/*"
+  - from: assets/
+    to: assets
+    filter:
+      - "**/*"
+
+# ── Publicación en GitHub Releases ───────────────────────────────────────────
+# electron-updater lee latest.yml desde aquí automáticamente
+publish:
+  provider: github
+  owner: PabloGutsan      
+  repo: nuventa-releases         
+  releaseType: release
+
+# ── Windows ──────────────────────────────────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: assets/icons/icon.ico     # debe ser .ico para Windows
+  artifactName: "Nuventa-Setup-${version}.exe"
+  # Sin firma por ahora — el usuario puede saltarse SmartScreen
+  # signingHashAlgorithms: ["sha256"]
+  # certificateFile: cert.pfx
+  # certificatePassword: ""
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Nuventa
+  installerIcon: assets/icons/icon.ico
+  uninstallerIcon: assets/icons/icon.ico
+  installerHeaderIcon: assets/icons/icon.ico
+  # ── Pantalla de T&C nativa en el instalador ───────────────────────────────
+  # El usuario debe aceptar antes de poder instalar
+  license: assets/license.txt
+  # Texto del botón de instalación
+  runAfterFinish: true
+
+# ── Mac ───────────────────────────────────────────────────────────────────────
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64          # Apple Silicon (M1/M2/M3)
+  icon: assets/icons/icon.icns   # debe ser .icns para Mac
+  artifactName: "Nuventa-${version}-mac.dmg"
+  category: public.app-category.business
+  # Sin firma por ahora
+  # identity: "Developer ID Application: Tu Nombre (XXXXXXXXXX)"
+  # hardenedRuntime: true
+  # gatekeeperAssess: false
+  # entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  title: "Nuventa ${version}"
+  background: assets/dmg-background.png   # opcional, puede omitirse
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 380
+
+# ── Linux (opcional) ──────────────────────────────────────────────────────────
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: assets/icons/icon.png
+  artifactName: "Nuventa-${version}.AppImage"
+  category: Office

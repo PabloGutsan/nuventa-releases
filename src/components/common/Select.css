@@ -1,0 +1,253 @@
+/* src/components/common/Select.css */
+
+.select-wrapper {
+    position: relative;
+    margin-bottom: 16px;
+    width: 100%;
+}
+
+.select-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    color: #374151;
+}
+
+.select-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 42px;
+}
+
+.select-container:hover:not(.select-disabled) {
+    border-color: #9ca3af;
+}
+
+.select-open {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.select-error {
+    border-color: #ef4444 !important;
+}
+
+.select-disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.select-icon {
+    display: flex;
+    align-items: center;
+    margin-right: 8px;
+    color: #6b7280;
+}
+
+.select-display {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.select-value {
+    color: #111827;
+    font-size: 15px;
+}
+
+.select-placeholder {
+    color: #9ca3af;
+    font-size: 15px;
+}
+
+.select-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+}
+
+.select-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    color: #6b7280;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.select-clear:hover {
+    background-color: #f3f4f6;
+    color: #ef4444;
+}
+
+.select-arrow {
+    display: flex;
+    align-items: center;
+    color: #6b7280;
+    transition: transform 0.2s ease;
+}
+
+.select-arrow-up {
+    transform: rotate(180deg);
+}
+
+/* Dropdown */
+.select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    z-index: 1000;
+    max-height: 300px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: selectSlideDown 0.2s ease;
+}
+
+@keyframes selectSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Search */
+.select-search {
+    position: relative;
+    padding: 8px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    background-color: #f9fafb;
+}
+
+.select-search-icon {
+    position: absolute;
+    left: 16px;
+    color: #6b7280;
+}
+
+.select-search-input {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 6px 12px 6px 36px;
+    font-size: 14px;
+    outline: none;
+    background: white;
+}
+
+.select-search-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Options */
+.select-options {
+    overflow-y: auto;
+    max-height: 250px;
+}
+
+.select-option {
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 14px;
+    color: #374151;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.select-option:last-child {
+    border-bottom: none;
+}
+
+.select-option:hover {
+    background-color: #f9fafb;
+}
+
+.select-option-selected {
+    background-color: #eff6ff;
+    color: #2563eb;
+    font-weight: 500;
+}
+
+.select-option-selected:hover {
+    background-color: #dbeafe;
+}
+
+.select-empty {
+    padding: 20px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 14px;
+}
+
+/* Error and Helper Text */
+.select-error-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    color: #ef4444;
+}
+
+.select-helper-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+/* Scrollbar personalizado para opciones */
+.select-options::-webkit-scrollbar {
+    width: 6px;
+}
+
+.select-options::-webkit-scrollbar-track {
+    background: #f9fafb;
+}
+
+.select-options::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.select-options::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Animación para opciones */
+.select-option {
+    animation: selectOptionFadeIn 0.15s ease;
+}
+
+@keyframes selectOptionFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}

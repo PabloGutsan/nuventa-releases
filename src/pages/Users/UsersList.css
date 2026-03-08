@@ -1,0 +1,457 @@
+/* ============================================================================
+   USERS LIST — Estilos completamente independientes
+   Prefijo: ul- para todas las clases del patrón compartido
+   No depende de ningún otro componente
+   ============================================================================ */
+
+.users-list {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ── Page Header ─────────────────────────────────────────────────────────────*/
+.ul-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.ul-page-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px 0;
+    line-height: 1.2;
+}
+
+.ul-page-subtitle {
+    font-size: 16px;
+    color: #6b7280;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* ── Alerta límite ───────────────────────────────────────────────────────────*/
+.ul-alert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.ul-alert--warning {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+/* ── Stats — 4 columnas, patrón stat-card-a ──────────────────────────────────*/
+.ul-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.ul-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    background: white;
+    border-radius: 12px;
+    border-left: 3px solid #2563eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    cursor: default;
+}
+
+.ul-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10);
+    transform: translateY(-1px);
+}
+
+.ul-stat-card--green  { border-left-color: #10b981; }
+.ul-stat-card--red    { border-left-color: #ef4444; }
+.ul-stat-card--yellow { border-left-color: #f59e0b; }
+
+/* Ícono wrapper tonal */
+.ul-stat-icon {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.ul-stat-card:hover .ul-stat-icon { transform: scale(1.06); }
+
+.ul-stat-icon--blue   { background: #eff6ff; }
+.ul-stat-icon--green  { background: #ecfdf5; }
+.ul-stat-icon--red    { background: #fef2f2; }
+.ul-stat-icon--yellow { background: #fffbeb; }
+
+/* Texto */
+.ul-stat-body { display: flex; flex-direction: column; gap: 3px; }
+
+.ul-stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.ul-stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ul-stat-sub {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+    margin-top: 1px;
+}
+
+/* ── Tabla ───────────────────────────────────────────────────────────────────*/
+.ul-table-container { overflow-x: auto; }
+
+.users-table { width: 100%; border-collapse: collapse; }
+
+.users-table thead {
+    background-color: #f9fafb;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.users-table th {
+    padding: 13px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 2px solid #e5e7eb;
+    white-space: nowrap;
+}
+
+.users-table tbody tr {
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.15s ease;
+}
+
+.users-table tbody tr:hover { background-color: #f9fafb; }
+
+.users-table tbody tr.inactive-row { opacity: 0.55; }
+
+.users-table td {
+    padding: 13px 16px;
+    font-size: 14px;
+    color: #374151;
+    vertical-align: middle;
+}
+
+/* ── Celda username ──────────────────────────────────────────────────────────*/
+.ul-username-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.ul-username-cell svg { color: #2563eb; flex-shrink: 0; }
+
+.ul-current-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* ── Role badge ──────────────────────────────────────────────────────────────*/
+.ul-role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.ul-role-badge--admin      { background: #fef3c7; color: #92400e; }
+.ul-role-badge--vendedor   { background: #dbeafe; color: #1e40af; }
+.ul-role-badge--inventario { background: #d1fae5; color: #065f46; }
+
+/* ── Last login ──────────────────────────────────────────────────────────────*/
+.ul-login-recent { font-size: 13px; color: #374151; }
+.ul-login-never  { font-size: 13px; color: #9ca3af; font-style: italic; }
+
+/* ── Status badge ────────────────────────────────────────────────────────────*/
+.ul-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.ul-status-badge--active   { background: #d1fae5; color: #065f46; }
+.ul-status-badge--inactive { background: #fee2e2; color: #991b1b; }
+
+/* ── Action buttons — 3 variantes ────────────────────────────────────────────*/
+.ul-action-buttons { display: flex; gap: 6px; }
+
+.ul-action-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 15px;
+}
+
+.ul-action-btn.edit       { background: #dbeafe; color: #1e40af; }
+.ul-action-btn.password   { background: #fef3c7; color: #92400e; }
+.ul-action-btn.activate   { background: #d1fae5; color: #065f46; }
+.ul-action-btn.deactivate { background: #fee2e2; color: #991b1b; }
+
+.ul-action-btn.edit:hover       { background: #bfdbfe; transform: scale(1.07); }
+.ul-action-btn.password:hover   { background: #fde68a; transform: scale(1.07); }
+.ul-action-btn.activate:hover   { background: #a7f3d0; transform: scale(1.07); }
+.ul-action-btn.deactivate:hover { background: #fecaca; transform: scale(1.07); }
+
+.ul-action-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* ── Info section ────────────────────────────────────────────────────────────*/
+.ul-info-section { padding: 4px 0; }
+
+.ul-info-section h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 16px 0;
+}
+
+.ul-info-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ul-info-list > li {
+    padding: 14px 16px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border-left: 3px solid #2563eb;
+    font-size: 14px;
+    color: #374151;
+}
+
+.ul-info-list > li strong {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+}
+
+/* Lista de roles dentro de info */
+.ul-roles-list {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ul-roles-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────────*/
+.ul-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #9ca3af;
+    text-align: center;
+    gap: 10px;
+}
+
+.ul-empty-state svg { color: #d1d5db; }
+
+.ul-empty-state p {
+    font-size: 16px;
+    font-weight: 600;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────────────*/
+.ul-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    gap: 16px;
+}
+
+.ul-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: ul-spin 0.8s linear infinite;
+}
+
+@keyframes ul-spin { to { transform: rotate(360deg); } }
+
+.ul-loading p { font-size: 15px; color: #6b7280; font-weight: 500; margin: 0; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────────*/
+@media (max-width: 1024px) {
+    .ul-stats { grid-template-columns: repeat(2, 1fr); }
+    .users-table th, .users-table td { padding: 10px 12px; }
+}
+
+@media (max-width: 768px) {
+    .ul-page-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .ul-page-title  { font-size: 26px; }
+    .ul-stats       { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .ul-stat-value  { font-size: 20px; }
+}
+
+@media (max-width: 480px) {
+    .ul-stats      { grid-template-columns: 1fr; }
+    .ul-stat-value { font-size: 18px; }
+}
+
+/* ── Dialog React (reemplaza window.confirm / window.alert en Electron) ─────── */
+.ul-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+
+.ul-dialog {
+    background: #fff;
+    border-radius: 14px;
+    padding: 32px 28px 24px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+}
+
+.ul-dialog-icon   { font-size: 2.5rem; line-height: 1; }
+
+.ul-dialog-message {
+    font-size: 0.95rem;
+    color: #374151;
+    line-height: 1.6;
+    white-space: pre-line;
+    margin: 0;
+}
+
+.ul-dialog-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+    width: 100%;
+}
+
+.ul-dialog-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.ul-dialog-btn:active { transform: scale(0.97); }
+
+.ul-dialog-btn--cancel  { background: #f3f4f6; color: #374151; }
+.ul-dialog-btn--cancel:hover  { background: #e5e7eb; }
+
+.ul-dialog-btn--danger  { background: #ef4444; color: #fff; }
+.ul-dialog-btn--danger:hover  { background: #dc2626; }
+
+.ul-dialog-btn--success { background: #10b981; color: #fff; }
+.ul-dialog-btn--success:hover { background: #059669; }
+
+.ul-dialog-btn--warning { background: #f59e0b; color: #fff; }
+.ul-dialog-btn--warning:hover { background: #d97706; }
+
+.ul-dialog-btn--primary { background: #4f46e5; color: #fff; }
+.ul-dialog-btn--primary:hover { background: #4338ca; }
+
+.ul-action-btn.reset {
+    color: #7c3aed;
+    background: #ede9fe;
+    border: 1px solid #ddd6fe;
+}
+.ul-action-btn.reset:hover { background: #ddd6fe; }

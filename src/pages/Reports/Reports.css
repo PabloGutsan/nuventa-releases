@@ -1,0 +1,665 @@
+/* ============================================================================
+   REPORTS - Módulo de Reportes
+   Alineado al design system de la app.
+   Solo cambia presentación visual, no lógica.
+   ============================================================================ */
+
+.rp-page {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────*/
+.rp-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+/* Alineado con .page-title / .page-subtitle del sistema */
+.rp-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px;
+    line-height: 1.2;
+}
+
+.rp-subtitle {
+    font-size: 16px;
+    color: #6b7280;
+    margin: 0;
+    font-weight: 400;
+}
+
+.rp-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Botones export — ghost claro (mismo estilo que SalesHistory/Customers) ─*/
+.rp-btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.rp-btn-excel {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+.rp-btn-excel:hover:not(:disabled) { background: #dcfce7; border-color: #86efac; }
+
+.rp-btn-pdf {
+    background: #fff1f2;
+    color: #dc2626;
+    border: 1px solid #fecdd3;
+}
+.rp-btn-pdf:hover:not(:disabled) { background: #ffe4e6; border-color: #fca5a5; }
+
+.rp-btn-export:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Botón refresh — mismo patrón que el resto de la app */
+.rp-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+.rp-refresh:hover { background: #f9fafb; border-color: #d1d5db; }
+.rp-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+
+/* ── Selector de período ─────────────────────────────────────────────────────*/
+.rp-period-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rp-period-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.rp-period-btn {
+    padding: 7px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+.rp-period-btn:hover { background: #f3f4f6; color: #374151; }
+.rp-period-btn.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+
+.rp-date-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.rp-date-input {
+    padding: 7px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #374151;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+}
+.rp-date-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────────────*/
+.rp-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+    gap: 16px;
+    color: #9ca3af;
+}
+
+.rp-loading p {
+    font-size: 15px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+/* ── MetricCards — alineadas al patrón stat-card-a (borde izquierdo) ─────────
+   Se mantiene el componente MetricCard con sus clases rp-metric--color,
+   pero el acento pasa a borde izquierdo en vez de borde superior.
+   ─────────────────────────────────────────────────────────────────────────── */
+.rp-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.rp-metric {
+    background: white;
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;          /* centrado vertical como stat-card-a */
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    cursor: default;
+    /* Borde izquierdo como acento — patrón del sistema */
+    border-left: 3px solid #e5e7eb; /* fallback, sobreescrito por color class */
+}
+
+.rp-metric:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10);
+    transform: translateY(-1px);
+}
+
+/* Color del borde izquierdo por variante */
+.rp-metric--blue   { border-left-color: #2563eb; }
+.rp-metric--red    { border-left-color: #ef4444; }
+.rp-metric--green  { border-left-color: #10b981; }
+.rp-metric--purple { border-left-color: #7c3aed; }
+
+/* Ícono tonal suave — mismo tamaño y radio que sca-icon */
+.rp-metric-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.rp-metric:hover .rp-metric-icon { transform: scale(1.06); }
+
+.rp-metric--blue   .rp-metric-icon { background: #eff6ff; color: #2563eb; }
+.rp-metric--red    .rp-metric-icon { background: #fef2f2; color: #ef4444; }
+.rp-metric--green  .rp-metric-icon { background: #f0fdf4; color: #10b981; }
+.rp-metric--purple .rp-metric-icon { background: #f5f3ff; color: #7c3aed; }
+
+.rp-metric-body { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+
+/* Label — idéntico a sca-label */
+.rp-metric-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* Valor — idéntico a sca-value */
+.rp-metric-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+/* Sub — idéntico a sca-sub */
+.rp-metric-sub {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 400;
+    margin: 0;
+}
+
+/* Badge de variación vs período anterior */
+.rp-metric-var {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+.rp-metric-var span { font-size: 10px; font-weight: 400; color: #9ca3af; }
+.rp-metric-var.up   { color: #10b981; }
+.rp-metric-var.down { color: #ef4444; }
+
+/* ── Cards genéricas ─────────────────────────────────────────────────────────*/
+.rp-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rp-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rp-card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.rp-card-header-row .rp-card-title { margin-bottom: 0; }
+
+.rp-alert-icon { color: #f59e0b; }
+
+.rp-badge-count {
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 99px;
+}
+
+/* ── Fila de 2 columnas ──────────────────────────────────────────────────────*/
+.rp-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* ── Formas de pago ──────────────────────────────────────────────────────────*/
+.rp-payment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.rp-payment-row { display: flex; flex-direction: column; gap: 5px; }
+
+.rp-payment-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rp-payment-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.rp-payment-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    flex: 1;
+}
+
+.rp-payment-count {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.rp-payment-right {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px;
+}
+
+.rp-payment-pct {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.rp-payment-amount {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.rp-bar-bg {
+    height: 5px;
+    background: #f3f4f6;
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.rp-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.6s ease;
+}
+
+/* ── Vendedores ──────────────────────────────────────────────────────────────*/
+.rp-seller-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rp-seller-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f9fafb;
+    border: 1px solid #f3f4f6;
+    transition: background 0.15s;
+}
+
+.rp-seller-row:hover { background: #f3f4f6; }
+
+.rp-seller-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.rp-seller-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.rp-seller-name  { font-size: 13px; font-weight: 600; color: #111827; }
+.rp-seller-count { font-size: 11px; color: #9ca3af; }
+
+.rp-seller-amounts {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.rp-seller-sales  { font-size: 13px; font-weight: 700; color: #111827; }
+.rp-seller-profit { font-size: 11px; color: #10b981; font-weight: 600; }
+
+/* ── Tabla — alineada al patrón del sistema ──────────────────────────────────*/
+.rp-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.rp-table thead tr {
+    background-color: #f9fafb;
+}
+
+/* th: idéntico al patrón de SalesHistory y CustomerList */
+.rp-table th {
+    padding: 11px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 2px solid #e5e7eb;
+    white-space: nowrap;
+}
+
+.rp-table td {
+    padding: 11px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+    vertical-align: middle;
+    font-size: 13px;
+}
+
+.rp-table tbody tr:last-child td { border-bottom: none; }
+.rp-table tbody tr:hover { background: #f9fafb; }
+
+/* Ranking — mismo patrón que rank-badge del Dashboard */
+.rp-rank {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.rp-rank--1    { background: linear-gradient(135deg, #ffd700, #ffed4e); color: #92400e; }
+.rp-rank--2    { background: linear-gradient(135deg, #c0c0c0, #e8e8e8); color: #374151; }
+.rp-rank--3    { background: linear-gradient(135deg, #cd7f32, #e09858); color: #78350f; }
+.rp-rank--rest { background: #f3f4f6; color: #6b7280; }
+
+.rp-product-name {
+    font-weight: 500;
+    max-width: 220px;
+    color: #111827;
+}
+
+.rp-cost-cell { color: #9ca3af; }
+
+.rp-profit-badge {
+    background: #f0fdf4;
+    color: #166534;
+    font-weight: 600;
+    font-size: 12px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    display: inline-block;
+}
+
+.rp-margin-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 5px;
+    display: inline-block;
+}
+.rp-margin-badge.positive { background: #dcfce7; color: #166534; }
+.rp-margin-badge.negative { background: #fee2e2; color: #991b1b; }
+
+/* Stock badges — mismo estilo que stock-low-badge */
+.rp-stock-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 5px;
+    background: #f3f4f6;
+    color: #374151;
+}
+.rp-stock-badge.zero { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.rp-stock-badge.low  { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+
+/* ── Estados vacíos ──────────────────────────────────────────────────────────*/
+.rp-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #9ca3af;
+    font-size: 14px;
+}
+
+.rp-all-good {
+    padding: 20px;
+    text-align: center;
+    color: #166534;
+    background: #f0fdf4;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid #bbf7d0;
+}
+
+/* ── Tooltip del gráfico ─────────────────────────────────────────────────────*/
+.rp-tooltip {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    font-size: 13px;
+    min-width: 180px;
+}
+
+.rp-tooltip-label {
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 8px;
+    font-size: 13px;
+}
+
+.rp-tooltip-divider {
+    height: 1px;
+    background: #f3f4f6;
+    margin: 6px 0;
+}
+
+.rp-tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+.rp-tooltip-row span { color: #6b7280; }
+
+.rp-tooltip-margin {
+    font-size: 11px;
+    font-weight: 700;
+    color: #10b981;
+    text-align: right;
+    margin: 0;
+}
+
+/* ── Leyenda custom del gráfico apilado ──────────────────────────────────────*/
+.rp-chart-legend-custom {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.rp-cleg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.rp-cleg::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+.rp-cleg--cost::before   { background: #f87171; }
+.rp-cleg--profit::before { background: #34d399; }
+.rp-cleg--cost   { color: #dc2626; }
+.rp-cleg--profit { color: #059669; }
+.rp-cleg--total  { color: #6b7280; font-weight: 400; font-size: 11px; }
+
+/* ── Botón Ver todos / Ver menos ─────────────────────────────────────────────*/
+.rp-show-all-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8fafc;
+    border: 1px dashed #d1d5db;
+    border-radius: 8px;
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    font-family: inherit;
+}
+.rp-show-all-btn:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────*/
+@media (max-width: 900px) {
+    .rp-metrics { grid-template-columns: repeat(2, 1fr); }
+    .rp-title   { font-size: 26px; }
+}
+
+@media (max-width: 768px) {
+    .rp-header      { flex-direction: column; gap: 16px; }
+    .rp-header-actions { flex-wrap: wrap; }
+    .rp-row-2       { grid-template-columns: 1fr; }
+    .rp-period-bar  { flex-direction: column; align-items: flex-start; }
+    .rp-metric-value { font-size: 19px; }
+}
+
+@media (max-width: 540px) {
+    .rp-metrics      { grid-template-columns: 1fr; }
+    .rp-metric-value { font-size: 18px; }
+}

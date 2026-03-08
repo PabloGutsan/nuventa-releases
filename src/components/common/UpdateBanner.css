@@ -1,0 +1,153 @@
+/* src/components/common/UpdateBanner.css */
+
+.ub-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%);
+    color: white;
+    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.4);
+    animation: ub-slide-down 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+.ub-banner--obligatory {
+    background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%);
+    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+}
+
+@keyframes ub-slide-down {
+    from { transform: translateY(-100%); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* ── Contenido principal ──────────────────────────────────────────────── */
+.ub-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.ub-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+/* ── Texto ────────────────────────────────────────────────────────────── */
+.ub-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ub-title {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ub-notes {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Acciones ─────────────────────────────────────────────────────────── */
+.ub-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.ub-btn {
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ub-btn--download {
+    padding: 7px 16px;
+    background: #F97316;
+    color: white;
+    font-size: 13px;
+}
+
+.ub-btn--download:hover:not(:disabled) {
+    background: #ea6c0a;
+    transform: translateY(-1px);
+}
+
+.ub-btn--download:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.ub-btn--dismiss {
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+}
+
+.ub-btn--dismiss:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+}
+
+.ub-no-url {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+}
+
+/* Spinner */
+.ub-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: ub-spin 0.7s linear infinite;
+}
+
+@keyframes ub-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Mensaje obligatorio ──────────────────────────────────────────────── */
+.ub-obligatory-msg {
+    padding: 8px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .ub-content {
+        flex-wrap: wrap;
+        padding: 10px 16px;
+    }
+    .ub-notes {
+        display: none;
+    }
+}

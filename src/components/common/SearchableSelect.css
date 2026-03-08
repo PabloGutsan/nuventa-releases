@@ -1,0 +1,237 @@
+/* ============================================================================
+   SearchableSelect — select con búsqueda integrada y altura máxima
+   Guardar en: src/components/common/SearchableSelect.css
+   ============================================================================ */
+
+.ss-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Label */
+.ss-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    line-height: 1;
+}
+
+.ss-required {
+    color: #ef4444;
+}
+
+/* ── Trigger ── */
+.ss-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 0 10px;
+    height: 38px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    color: #111827;
+}
+
+.ss-trigger:hover:not(.ss-trigger--disabled) {
+    border-color: #93c5fd;
+}
+
+.ss-trigger--open {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.ss-trigger--disabled {
+    background: #f9fafb;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.ss-wrapper--error .ss-trigger {
+    border-color: #ef4444;
+}
+
+.ss-wrapper--error .ss-trigger--open {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.ss-trigger-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: #111827;
+}
+
+.ss-trigger-text--placeholder {
+    color: #9ca3af;
+}
+
+.ss-trigger-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* Botón limpiar dentro del trigger */
+.ss-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #6b7280;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.ss-clear:hover {
+    background: #fca5a5;
+    color: #dc2626;
+}
+
+/* Chevron */
+.ss-chevron {
+    color: #9ca3af;
+    transition: transform 0.18s;
+    flex-shrink: 0;
+}
+
+.ss-chevron--open {
+    transform: rotate(180deg);
+    color: #2563eb;
+}
+
+/* ── Dropdown ──
+   position, top/bottom, left, width, zIndex se inyectan via style prop (position:fixed)
+   para escapar de cualquier overflow:hidden en Card, Modal o contenedor padre.
+   ─────────────────────────────────────────────────────────────────────────────*/
+.ss-dropdown {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+/* Buscador */
+.ss-search-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 10px;
+    border-bottom: 1px solid #f3f4f6;
+    background: #fafafa;
+}
+
+.ss-search-icon {
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+.ss-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 13px;
+    color: #111827;
+    min-width: 0;
+    font-family: inherit;
+}
+
+.ss-search-input::placeholder {
+    color: #9ca3af;
+}
+
+.ss-search-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    border: none;
+    background: #e5e7eb;
+    border-radius: 50%;
+    color: #6b7280;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s;
+    padding: 0;
+}
+
+.ss-search-clear:hover {
+    background: #d1d5db;
+}
+
+/* Lista con scroll */
+.ss-list {
+    max-height: 200px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.ss-list::-webkit-scrollbar          { width: 5px; }
+.ss-list::-webkit-scrollbar-track    { background: transparent; }
+.ss-list::-webkit-scrollbar-thumb    { background: #d1d5db; border-radius: 4px; }
+.ss-list::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* Opción */
+.ss-option {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: white;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-size: 13px;
+    color: #374151;
+    transition: background 0.1s;
+    font-family: inherit;
+}
+
+.ss-option:hover {
+    background: #f0f9ff;
+    color: #1e40af;
+}
+
+.ss-option--active {
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+/* Sin resultados */
+.ss-empty {
+    padding: 12px;
+    font-size: 13px;
+    color: #9ca3af;
+    text-align: center;
+}
+
+/* Mensajes */
+.ss-error {
+    font-size: 12px;
+    color: #ef4444;
+    font-weight: 500;
+}
+
+.ss-helper {
+    font-size: 12px;
+    color: #6b7280;
+}

@@ -1,0 +1,236 @@
+.user-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+.user-modal {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    animation: modalFadeIn 0.2s ease;
+}
+.user-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 28px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.user-modal-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+}
+.user-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px;
+}
+.form-field { margin-bottom: 20px; }
+.form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 6px;
+}
+.required { color: #ef4444; }
+.form-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--gray-700);
+    background-color: white;
+    transition: all 0.2s ease;
+}
+.form-select:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+.user-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 28px;
+    border-top: 1px solid #e5e7eb;
+}
+.user-modal-body::-webkit-scrollbar { width: 8px; }
+.user-modal-body::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+.user-modal-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+.user-modal-body::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+}
+@media (max-width: 768px) {
+    .user-modal { max-width: 100%; max-height: 100vh; border-radius: 0; }
+    .user-modal-footer { flex-direction: column; }
+    .user-modal-footer button { width: 100%; }
+}
+
+/* ── Botón ojo ───────────────────────────────────────────────────────────────*/
+.um-eye-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: none;
+    color: #9ca3af;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+    padding: 0;
+    margin-right: 2px;
+}
+.um-eye-btn:hover {
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+/* ── Tarjetas de selección de rol ────────────────────────────────────────────*/
+.um-role-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+.um-role-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: #fafafa;
+    user-select: none;
+}
+.um-role-card:hover {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+.um-role-card--active {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+.um-role-card__icon {
+    font-size: 22px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.um-role-card__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+.um-role-card__label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    line-height: 1.3;
+}
+.um-role-card__desc {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+.um-role-card__check {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.um-role-card--active .um-role-card__check {
+    opacity: 1;
+}
+
+/* ── Bloque de permisos ──────────────────────────────────────────────────────*/
+.um-perms {
+    margin-top: 4px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+.um-perms__title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 10px;
+}
+.um-perms__grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.um-perm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+}
+.um-perm-badge--ok {
+    background: #dcfce7;
+    color: #15803d;
+}
+.um-perm-badge--no {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+/* ── Aviso cambio de contraseña en primer login ──────────────────────────────*/
+.um-first-login-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: #92400e;
+    font-weight: 500;
+    line-height: 1.4;
+    margin-top: 4px;
+}
+.um-first-login-notice__icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}

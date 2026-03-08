@@ -1,0 +1,51 @@
+.pos-main {
+    display: flex;
+    height: calc(100vh - 70px); /* Altura total menos el header */
+    width: 100%;
+    overflow: hidden; /* ✅ CRÍTICO: Evita scroll en toda la página */
+    position: relative;
+}
+
+/* Centro - Búsqueda de productos (protagonista) */
+.pos-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    overflow-y: auto; /* Scroll solo aquí */
+    background-color: var(--gray-50);
+}
+
+.pos-header {
+    margin-bottom: 30px;
+}
+
+.pos-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 8px 0;
+}
+
+.pos-subtitle {
+    font-size: 16px;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .pos-main {
+        flex-direction: column;
+        height: auto;
+        overflow: visible;
+    }
+
+    .pos-center {
+        padding: 20px;
+    }
+
+    .pos-title {
+        font-size: 24px;
+    }
+}

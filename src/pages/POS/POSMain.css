@@ -1,0 +1,201 @@
+/* src/pages/POS/POSMain.css */
+
+.pos-main {
+    display: flex;
+    height: calc(100vh - 70px);
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ── Centro ── */
+.pos-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    overflow-y: auto;
+    background-color: var(--gray-50);
+}
+
+.pos-header {
+    margin-bottom: 30px;
+}
+
+/* Fila título + botón de caja */
+.pos-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.pos-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 8px 0;
+}
+
+.pos-subtitle {
+    font-size: 16px;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+    .pos-main {
+        flex-direction: column;
+        height: auto;
+        overflow: visible;
+    }
+
+    .pos-center {
+        padding: 20px;
+    }
+
+    .pos-title {
+        font-size: 24px;
+    }
+
+    .pos-header-top {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}
+
+/* ===============================================
+   TOAST DE ÉXITO
+   =============================================== */
+
+.success-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    animation: slideInRight 0.3s ease-out, slideOutRight 0.3s ease-in 2.7s forwards;
+}
+
+.success-toast-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+    font-weight: 500;
+    font-size: 16px;
+}
+
+.success-icon {
+    font-size: 24px;
+}
+
+.success-message {
+    font-size: 15px;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(400px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+}
+
+@keyframes slideOutRight {
+    from { transform: translateX(0);     opacity: 1; }
+    to   { transform: translateX(400px); opacity: 0; }
+}
+
+/* ===============================================
+   LOADING
+   =============================================== */
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 16px;
+    color: var(--gray-500);
+}
+
+.spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--primary-600);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── POSDialog (reemplaza window.alert y window.confirm en POSMain) ── */
+.pos-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+
+.pos-dialog {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 24px 20px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+}
+
+.pos-dialog-icon  { font-size: 2.2rem; line-height: 1; }
+
+.pos-dialog-message {
+    font-size: 0.92rem;
+    color: #374151;
+    line-height: 1.6;
+    white-space: pre-line;
+    margin: 0;
+}
+
+.pos-dialog-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    width: 100%;
+}
+
+.pos-dialog-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, transform 0.1s;
+}
+.pos-dialog-btn:active { transform: scale(0.98); }
+
+.pos-dialog-btn--cancel  { background: #f3f4f6; color: #374151; }
+.pos-dialog-btn--cancel:hover  { background: #e5e7eb; }
+
+.pos-dialog-btn--danger  { background: #ef4444; color: #fff; }
+.pos-dialog-btn--danger:hover  { background: #dc2626; }
+
+.pos-dialog-btn--success { background: #10b981; color: #fff; }
+.pos-dialog-btn--success:hover { background: #059669; }
+
+.pos-dialog-btn--primary { background: #4f46e5; color: #fff; }
+.pos-dialog-btn--primary:hover { background: #4338ca; }

@@ -1,0 +1,97 @@
+/* CustomerDetailModal.css
+   Importa el sistema base sdm-* de ProductDetailModal.css y agrega
+   únicamente los tokens exclusivos de clientes.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Si ProductDetailModal.css ya está cargado en el bundle, este archivo
+      solo necesita los overrides y adiciones exclusivas de clientes.
+      Si se carga de forma independiente, incluir también las reglas base. ── */
+
+/* Avatar circular para personas (los productos usan border-radius: 12px) */
+.sdm-avatar--circle {
+    border-radius: 50% !important;
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Badges tipo cliente (Empresa / Persona natural) */
+.sdm-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+}
+.sdm-type-badge.empresa { background: rgba(79, 70, 229, 0.3); color: #c7d2fe; }
+.sdm-type-badge.persona { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+
+/* ── Stats row (4 tarjetas de métricas) ── */
+.sdm-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.sdm-stat-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sdm-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.sdm-stat-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.sdm-stat-label {
+    font-size: 11px;
+    color: #9ca3af;
+    font-family: 'Poppins', sans-serif;
+    white-space: nowrap;
+}
+
+.sdm-stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+    font-family: 'Poppins', sans-serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sdm-stat-value.sdm-stat-green { color: #10b981; }
+.sdm-stat-value.sdm-stat-sm    { font-size: 13px; }
+
+/* ── Grid 2 columnas para datos de empresa ── */
+.sdm-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+    .sdm-stats-row { grid-template-columns: repeat(2, 1fr); }
+    .sdm-grid-2    { grid-template-columns: 1fr; }
+}

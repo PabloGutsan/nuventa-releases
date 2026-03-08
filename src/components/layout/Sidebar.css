@@ -1,0 +1,277 @@
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 70px; /* Comienza después del header */
+    height: calc(100vh - 70px); /* Altura completa menos el header */
+    background-color: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    transition: width 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    z-index: 999;
+}
+
+.sidebar-open {
+    width: 260px;
+}
+
+.sidebar-closed {
+    width: 70px;
+}
+
+/* ========================================
+   MENÚ DE NAVEGACIÓN PRINCIPAL
+======================================== */
+.sidebar-nav {
+    flex: 1;
+    padding: 20px 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ========================================
+   ITEMS DEL MENÚ
+======================================== */
+.sidebar-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--gray-600);
+    font-size: 15px;
+    font-weight: 500;
+    text-align: left;
+}
+
+.sidebar-open .sidebar-item {
+    justify-content: flex-start;
+}
+
+.sidebar-closed .sidebar-item {
+    justify-content: center;
+    padding: 14px 0;
+}
+
+.sidebar-item:hover {
+    background-color: var(--gray-50);
+    color: var(--gray-900);
+}
+
+.sidebar-item.active {
+    background-color: #eff6ff;
+    color: var(--primary-600);
+    border-left: 3px solid var(--primary-600);
+}
+
+.sidebar-icon {
+    font-size: 22px;
+    min-width: 22px;
+    flex-shrink: 0;
+}
+
+.sidebar-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-closed .sidebar-label {
+    display: none;
+}
+
+/* ========================================
+   SEPARADOR
+======================================== */
+.sidebar-divider {
+    height: 1px;
+    background-color: #e5e7eb;
+    margin: 12px 16px;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   FOOTER (CONFIGURACIÓN)
+======================================== */
+.sidebar-footer {
+    padding: 12px 0 20px 0;
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+    background-color: #ffffff;
+}
+
+/* ========================================
+   BOTÓN DE TOGGLE
+======================================== */
+.sidebar-toggle {
+    position: absolute;
+    right: -15px;
+    top: 80px;        /* ← Arriba */
+    width: 30px;      /* ← Más grande */
+    height: 30px;     /* ← Más grande */
+    border-radius: 50%;
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--gray-600);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-size: 16px;  /* ← Icono más grande */
+}
+
+.sidebar-toggle:hover {
+    background-color: var(--primary-50);
+    border-color: var(--primary-300);
+    color: var(--primary-600);
+    transform: scale(1.1);
+}
+
+.sidebar-toggle:active {
+    transform: scale(0.95);
+}
+
+/* ========================================
+   SCROLLBAR PERSONALIZADO
+======================================== */
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+@media (max-width: 768px) {
+    .sidebar {
+        top: 70px;
+        transform: translateX(-100%);
+    }
+    
+    .sidebar-open {
+        transform: translateX(0);
+    }
+}
+
+/* ===============================================
+   SUBMENÚS
+   =============================================== */
+
+.sidebar-item-container {
+    width: 100%;
+}
+
+.sidebar-item {
+    position: relative;
+}
+
+.submenu-arrow {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    color: inherit;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-item:hover .submenu-arrow {
+    transform: translateX(2px);
+}
+
+/* Submenu container */
+.submenu {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0 8px 16px;  
+    margin-left: 16px;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 500px;
+    }
+}
+
+/* Submenu items */
+.submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    width: 100%;
+    text-align: left;
+}
+
+.submenu-item:hover {
+    background: rgba(37, 99, 235, 0.1);
+  
+}
+
+.submenu-item.active {
+    background: rgba(37, 99, 235, 0.15);
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.submenu-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+.submenu-item:hover .submenu-dot,
+.submenu-item.active .submenu-dot {
+    opacity: 1;
+    transform: scale(1.3);
+}
+
+.submenu-label {
+    flex: 1;
+}
+
+/* Sidebar cerrado - ocultar submenús */
+.sidebar-closed .submenu {
+    display: none;
+}
+
+.sidebar-closed .submenu-arrow {
+    display: none;
+}
+
+/* Item padre con submenu activo */
+.sidebar-item-container .sidebar-item.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+}

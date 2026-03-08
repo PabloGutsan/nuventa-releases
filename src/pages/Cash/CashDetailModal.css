@@ -1,0 +1,195 @@
+/* CashDetailModal.css
+   Extiende el sistema sdm-* con tokens exclusivos del detalle de turno de caja.
+   Requiere que ProductDetailModal.css esté cargado en el bundle (provee sdm-*).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Tabla detalle de ventas — altura máxima con scroll ── */
+.sdm-panel--wide .sdm-table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 300px;
+    scrollbar-width: thin;
+    scrollbar-color: #c7d2fe #f1f5f9;
+}
+.sdm-panel--wide .sdm-table-wrap::-webkit-scrollbar       { width: 6px; height: 6px; }
+.sdm-panel--wide .sdm-table-wrap::-webkit-scrollbar-track { background: #f1f5f9; }
+.sdm-panel--wide .sdm-table-wrap::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 3px; }
+.sdm-panel--wide .sdm-table-wrap::-webkit-scrollbar-thumb:hover { background: #a5b4fc; }
+
+.sdm-panel--wide .sdm-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+/* Badges de estado del turno */
+.sdm-badge.badge-open   { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+.sdm-badge.badge-closed { background: rgba(37, 99, 235, 0.2);  color: #93c5fd; }
+
+/* Badge contador (nº de ventas, movimientos) */
+.sdm-count-badge {
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 2px;
+}
+
+/* Total de ventas junto al título de la card */
+.cdm-total-ventas {
+    margin-left: auto;
+    font-size: 15px;
+    font-weight: 700;
+    color: #10b981;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* Colores diferencia */
+.sdm-diff--exact    { color: #10b981 !important; font-weight: 600 !important; }
+.sdm-diff--surplus  { color: #2563eb !important; font-weight: 600 !important; }
+.sdm-diff--shortage { color: #ef4444 !important; font-weight: 600 !important; }
+
+/* Loading centrado */
+.sdm-loading-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 80px 20px;
+    color: #6b7280;
+    font-size: 14px;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ── Arqueo de caja ── */
+.cdm-arqueo-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cdm-arqueo-divider {
+    border-top: 1px dashed #d1d5db;
+    margin: 4px 0;
+}
+
+.cdm-arqueo-total .sdm-label,
+.cdm-arqueo-total .sdm-value {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #1E1B4B !important;
+}
+
+/* Banner diferencia */
+.cdm-diff-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    border: 1px solid;
+    margin-top: 4px;
+}
+.cdm-diff-banner--exact    { background: #f0fdf4; border-color: #bbf7d0; color: #16a34a; }
+.cdm-diff-banner--surplus  { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
+.cdm-diff-banner--shortage { background: #fff1f2; border-color: #fecdd3; color: #dc2626; }
+
+/* Notas del turno */
+.cdm-notes-box {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #92400e;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ── Ventas por forma de pago ── */
+.cdm-pay-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.cdm-pay-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #f9fafb;
+    border: 1px solid #f3f4f6;
+    border-radius: 8px;
+}
+
+.cdm-pay-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    font-family: 'Poppins', sans-serif;
+}
+
+.cdm-pay-count {
+    font-size: 12px;
+    color: #9ca3af;
+    background: #e5e7eb;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.cdm-pay-amount {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Badge forma de pago en tabla */
+.cdm-pm-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #eff6ff;
+    color: #2563eb;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ── Movimientos de efectivo ── */
+.cdm-mov-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.cdm-mov {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Poppins', sans-serif;
+}
+.cdm-mov--in  { background: #ecfdf5; color: #059669; }
+.cdm-mov--out { background: #fff1f2; color: #dc2626; }
+
+.cdm-mov-arrow  { font-size: 16px; flex-shrink: 0; }
+.cdm-mov-reason { flex: 1; font-weight: 500; }
+.cdm-mov-user   { font-size: 11px; opacity: 0.7; }
+.cdm-mov-amount { font-weight: 700; white-space: nowrap; }

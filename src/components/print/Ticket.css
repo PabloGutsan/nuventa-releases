@@ -1,0 +1,193 @@
+/* ============================================================================
+   TICKET — Optimizado para impresora térmica 80mm (estándar Chile)
+   ============================================================================ */
+
+/* ── Medidas fijas para 80mm ─────────────────────────────────────────────── */
+/* Ancho físico del rollo: 80mm. Área imprimible real: ~72mm (margen ~4mm c/lado) */
+
+.ticket {
+    width: 80mm;
+    max-width: 80mm;
+    /* 4mm de padding lateral = 72mm de área útil de texto */
+    padding: 3mm 4mm 22mm 4mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt;
+    color: #000;
+    background: white;
+    box-sizing: border-box;
+    line-height: 1.35;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.ticket-header        { text-align: center; margin-bottom: 8px; }
+.ticket-logo          { max-width: 90px; max-height: 90px; margin-bottom: 6px; }
+.ticket-logo-placeholder { font-size: 40px; margin-bottom: 6px; }
+.ticket-business-name { font-size: 14pt; font-weight: bold; margin: 6px 0 3px 0; text-transform: uppercase; }
+.ticket-rut,
+.ticket-address,
+.ticket-contact       { font-size: 9pt; margin: 2px 0; }
+
+/* ── Divider — línea sólida CSS, llega de borde a borde ─────────────────── */
+.ticket-divider {
+    border: none;
+    border-top: 1px solid #000;
+    margin: 8px 0;
+    width: 100%;
+}
+
+/* ── Info ────────────────────────────────────────────────────────────────── */
+.ticket-info        { margin-bottom: 6px; }
+.ticket-info-row    { display: flex; justify-content: space-between; margin: 2px 0; font-size: 9pt; }
+.ticket-sale-number { font-weight: bold; }
+
+/* ── Items ───────────────────────────────────────────────────────────────── */
+.ticket-items { margin-bottom: 8px; }
+
+.ticket-items-header {
+    font-weight: bold;
+    font-size: 8.5pt;
+    padding: 2px 0;
+    margin-bottom: 2px;
+    text-align: left;
+    border-bottom: 1px dashed #000;
+}
+.col-desc { width: 100%; text-align: left; }
+
+/* Subheader: CANT. | P.UNIT | TOTAL
+   Columnas calibradas para 72mm de área útil */
+.ticket-items-subheader {
+    display: grid;
+    grid-template-columns: 22mm 1fr 1fr;
+    gap: 2px;
+    font-weight: bold;
+    font-size: 8.5pt;
+    margin-bottom: 4px;
+    padding: 2px 0;
+}
+.ticket-items-subheader .col-qty   { text-align: left; }
+.ticket-items-subheader .col-price { text-align: right; }
+.ticket-items-subheader .col-total { text-align: right; }
+
+/* Item */
+.ticket-item {
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dotted #999;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+.ticket-item:last-child { border-bottom: none; }
+
+.ticket-item-name { font-size: 9.5pt; font-weight: bold; margin-bottom: 2px; text-align: left; word-break: break-word; }
+.ticket-item-sku  { font-size: 7.5pt; color: #555; margin-bottom: 2px; text-align: left; }
+
+.ticket-item-details {
+    display: grid;
+    grid-template-columns: 22mm 1fr 1fr;
+    gap: 2px;
+    font-size: 9.5pt;
+    margin-top: 2px;
+}
+.ticket-item-details .col-qty   { text-align: left; font-weight: 600; }
+.ticket-item-details .col-price { text-align: right; }
+.ticket-item-details .col-total { text-align: right; font-weight: bold; }
+
+.ticket-item-discount { font-size: 8.5pt; color: #c00; margin-top: 2px; text-align: right; font-style: italic; }
+
+/* Compat. código antiguo */
+.ticket-item-row                  { display: grid; grid-template-columns: 22mm 1fr 1fr; gap: 2px; font-size: 9.5pt; }
+.ticket-item-row .col-qty         { text-align: left; font-weight: 600; }
+.ticket-item-row .col-price       { text-align: right; }
+.ticket-item-row .col-total       { text-align: right; font-weight: bold; }
+
+/* ── Totales ─────────────────────────────────────────────────────────────── */
+.ticket-totals    { margin: 8px 0; page-break-inside: avoid; break-inside: avoid; }
+.ticket-total-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 10pt; }
+.ticket-discount  { color: #555; font-style: italic; }
+.ticket-final     { font-weight: bold; font-size: 13pt; margin-top: 8px; padding-top: 6px; border-top: 2px solid #000; }
+
+/* ── Pago ────────────────────────────────────────────────────────────────── */
+.ticket-payment     { margin-bottom: 6px; page-break-inside: avoid; break-inside: avoid; }
+.ticket-payment-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 9pt; }
+.ticket-change      { font-weight: bold; }
+
+/* ── Documento ───────────────────────────────────────────────────────────── */
+.ticket-document     { margin-bottom: 6px; }
+.ticket-document-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 9pt; }
+.ticket-doc-number   { font-weight: bold; }
+
+/* ── Notas ───────────────────────────────────────────────────────────────── */
+.ticket-notes        { font-size: 9pt; margin-bottom: 6px; }
+.ticket-notes strong { display: block; margin-bottom: 3px; }
+.ticket-notes p      { margin: 0; white-space: pre-wrap; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.ticket-footer  { text-align: center; margin-top: 12px; padding-top: 6px; page-break-inside: avoid; break-inside: avoid; }
+.ticket-thanks  { font-size: 10pt; font-weight: bold; margin: 10px 0; }
+.ticket-system  { font-size: 7.5pt; color: #555; margin-top: 8px; margin-bottom: 0; }
+
+/* ============================================================================
+   IMPRESIÓN — @page con size 80mm auto es la clave para no cortar en A4
+   ============================================================================ */
+@media print {
+    @page {
+        size: 80mm auto;    /* ← CRÍTICO: auto = altura según contenido, no A4 */
+        margin: 0 !important;
+    }
+
+    html, body {
+        width: 80mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+    }
+
+    .ticket {
+        width: 80mm !important;
+        max-width: 80mm !important;
+        padding: 2mm 4mm 22mm 4mm !important;
+        margin: 0 !important;
+        font-size: 10pt !important;
+    }
+
+    .ticket-item,
+    .ticket-totals,
+    .ticket-payment,
+    .ticket-footer {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    * {
+        color: #000 !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .ticket-item-details,
+    .ticket-item-row,
+    .ticket-items-subheader {
+        display: grid !important;
+        grid-template-columns: 22mm 1fr 1fr !important;
+    }
+}
+
+/* ── Vista previa pantalla ───────────────────────────────────────────────── */
+@media screen {
+    .ticket {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+        margin: 20px auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+    }
+}
+/* ── Aviso legal — siempre al pie ── */
+.ticket-legal-notice {
+    font-size: 7.5pt;
+    color: #555;
+    text-align: center;
+    margin: 4px 0 0;
+    line-height: 1.4;
+    font-style: italic;
+}

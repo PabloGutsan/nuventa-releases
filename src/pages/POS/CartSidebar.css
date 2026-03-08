@@ -1,0 +1,630 @@
+.cart-sidebar {
+    width: 380px;
+    background: white;
+    border-left: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Header Compacto */
+.cart-sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 2px solid #e5e7eb;
+    background: var(--gray-50);
+    flex-shrink: 0;
+}
+
+.cart-sidebar-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+/* Selector de Cliente */
+.cart-customer {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: white;
+    flex-shrink: 0;
+}
+
+/* Items con Scroll Visible */
+.cart-sidebar-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    min-height: 0;
+    background: #fafafa;
+}
+
+.cart-sidebar-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--gray-400);
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.cart-sidebar-empty svg {
+    margin-bottom: 12px;
+}
+
+.cart-sidebar-empty p {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: var(--gray-600);
+}
+
+.cart-sidebar-empty small {
+    font-size: 13px;
+}
+
+/* Item del Carrito */
+.cart-sidebar-item {
+    padding: 10px;
+    background: white;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+}
+
+.cart-sidebar-item:hover {
+    border-color: var(--primary-300);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: var(--gray-50, #f9fafb);
+}
+
+.cart-sidebar-item:last-child {
+    margin-bottom: 0;
+}
+
+.cart-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 8px;
+}
+
+.cart-item-name-compact {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-900);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.3;
+}
+
+.service-badge-tiny {
+    font-size: 10px;
+    padding: 2px 5px;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 3px;
+}
+
+.cart-item-remove-btn {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--gray-400);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.cart-item-remove-btn:hover {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Cart item controls layout */
+.cart-item-controls {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+/* Controles de cantidad */
+.cart-item-qty-compact {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--gray-50, #f9fafb);
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--gray-200, #e5e7eb);
+}
+
+.qty-btn-compact {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--gray-700, #374151);
+}
+
+.qty-btn-compact:hover:not(:disabled) {
+    background: var(--primary-50, #eff6ff);
+    border-color: var(--primary-500, #2563eb);
+    color: var(--primary-600, #1d4ed8);
+}
+
+.qty-btn-compact:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.qty-btn-compact:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.qty-display {
+    min-width: 60px;
+    padding: 4px 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--gray-900, #111827);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.qty-display:hover:not(:disabled) {
+    background: var(--primary-50, #eff6ff);
+    color: var(--primary-600, #1d4ed8);
+}
+
+.qty-display:disabled {
+    cursor: not-allowed;
+}
+
+/* Modo edición de cantidad */
+.qty-edit-mode {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.qty-edit-input {
+    flex: 1;
+    min-width: 60px;
+    padding: 4px 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    border: 2px solid var(--primary-500, #2563eb);
+    border-radius: 4px;
+    outline: none;
+    background: white;
+}
+
+.qty-edit-input:focus {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.qty-edit-unit {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gray-600, #4b5563);
+    white-space: nowrap;
+}
+
+/* Precio */
+.cart-item-price-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.price-label {
+    font-size: 11px;
+    color: var(--gray-500, #6b7280);
+}
+
+.price-total {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gray-900, #111827);
+}
+
+.cart-item-discount-info {
+    margin-top: 6px;
+    padding: 4px 8px;
+    background: #fef3c7;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #92400e;
+    font-weight: 500;
+}
+
+/* Totales Compactos */
+.cart-sidebar-totals {
+    padding: 16px 20px;
+    background: var(--gray-50);
+    border-top: 2px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+.total-row-compact {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--gray-700);
+}
+
+.total-row-compact.final {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 2px solid #d1d5db;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.total-row-compact.final span:last-child {
+    font-size: 22px;
+    color: var(--primary-600);
+}
+
+/* Acciones */
+.cart-sidebar-actions {
+    padding: 14px 16px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid #e5e7eb;
+    background: white;
+    flex-shrink: 0;
+}
+
+/* Scrollbar */
+.cart-sidebar-items::-webkit-scrollbar { width: 8px; }
+.cart-sidebar-items::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 4px; }
+.cart-sidebar-items::-webkit-scrollbar-thumb { background: #9ca3af; border-radius: 4px; }
+.cart-sidebar-items::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .cart-sidebar {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid #e5e7eb;
+        max-height: 60vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .cart-item-controls {
+        grid-template-columns: 1fr;
+    }
+    .cart-item-qty-compact {
+        justify-content: center;
+    }
+    .qty-display {
+        min-width: 80px;
+    }
+}
+
+/* ============================================================================
+   CUSTOMER SELECTOR (cc-*) — Select con búsqueda integrada
+   ============================================================================ */
+
+/* Fila: trigger + botones */
+.cc-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── Trigger: parece un <select> nativo ── */
+.cc-trigger {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    height: 36px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #6b7280;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    text-align: left;
+    overflow: hidden;
+}
+
+.cc-trigger:hover:not(:disabled) {
+    border-color: #93c5fd;
+}
+
+.cc-trigger--open {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    color: #111827;
+}
+
+.cc-trigger--filled {
+    color: #111827;
+    font-weight: 500;
+}
+
+.cc-trigger:disabled {
+    background: #f9fafb;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.cc-trigger-icon {
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+.cc-trigger--filled .cc-trigger-icon {
+    color: #2563eb;
+}
+
+.cc-trigger-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cc-trigger-rut {
+    font-size: 11px;
+    font-weight: 400;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cc-chevron {
+    width: 16px;
+    height: 16px;
+    color: #9ca3af;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.cc-trigger--open .cc-chevron {
+    transform: rotate(180deg);
+    color: #2563eb;
+}
+
+/* ── Botón limpiar selección ── */
+.cc-clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 36px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    color: #9ca3af;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+
+.cc-clear-btn:hover:not(:disabled) {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #dc2626;
+}
+
+/* ── Botón crear nuevo cliente (+) ── */
+.cc-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #2563eb;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+
+.cc-add-btn:hover:not(:disabled) {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.cc-add-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Dropdown ── */
+.cc-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+/* Input de búsqueda dentro del dropdown */
+.cc-search {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #f3f4f6;
+    background: #fafafa;
+}
+
+.cc-search-icon {
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+.cc-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 13px;
+    color: #111827;
+}
+
+.cc-search-input::placeholder {
+    color: #9ca3af;
+}
+
+.cc-search-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: #e5e7eb;
+    border-radius: 50%;
+    color: #6b7280;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.cc-search-clear:hover {
+    background: #d1d5db;
+}
+
+/* Lista de resultados con scroll */
+.cc-list {
+    max-height: 220px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.cc-list::-webkit-scrollbar { width: 5px; }
+.cc-list::-webkit-scrollbar-track { background: transparent; }
+.cc-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+.cc-list::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* Item de la lista */
+.cc-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    background: white;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+}
+
+.cc-item:hover {
+    background: #f0f9ff;
+}
+
+.cc-item--active {
+    background: #eff6ff;
+}
+
+.cc-item--active .cc-item-name {
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+.cc-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cc-item-rut {
+    font-size: 11px;
+    color: #6b7280;
+    font-family: monospace;
+    background: #f3f4f6;
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cc-item--active .cc-item-rut {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* Estado vacío */
+.cc-empty {
+    padding: 14px 12px;
+    font-size: 13px;
+    color: #6b7280;
+    text-align: center;
+}
+
+.cc-empty-link {
+    background: none;
+    border: none;
+    color: #2563eb;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.cc-empty-link:hover {
+    color: #1d4ed8;
+}

@@ -1,0 +1,31 @@
+NUVENTA - SISTEMA PUNTO DE VENTAS
+Licencia de Usuario Final (EULA)
+Redinvierte SpA - www.nuventa.cl
+============================================================
+
+IMPORTANTE: LEA ESTE ACUERDO ANTES DE INSTALAR EL SOFTWARE.
+
+Al hacer clic en "Acepto" e instalar Nuventa, usted acepta
+quedar vinculado por los términos de este acuerdo.
+
+1. LICENCIA
+   Se le otorga una licencia personal, no exclusiva y no
+   transferible para instalar y usar Nuventa en un equipo.
+
+2. RESTRICCIONES
+   No puede copiar, modificar, distribuir, sublicenciar
+   ni realizar ingeniería inversa del software.
+
+3. DATOS
+   Sus datos operacionales se almacenan localmente.
+   Redinvierte SpA no tiene acceso a ellos.
+
+4. GARANTIA LIMITADA
+   El software se entrega "tal como es" sin garantias
+   expresas o implicitas.
+
+5. CONTACTO
+   soporte@nuventa.cl - www.nuventa.cl
+
+Copyright (c) 2026 Redinvierte SpA. Todos los derechos
+reservados.

@@ -1,0 +1,417 @@
+/* src/pages/License/LicenseActivation.css */
+
+/* ── Variables (consistentes con el sistema) ─────────────────────────── */
+:root {
+    --indigo:     #4F46E5;
+    --indigo-dark:#1E1B4B;
+    --indigo-light:#EEF2FF;
+    --orange:     #F97316;
+    --bg:         #f8f9ff;
+    --gray-50:    #f9fafb;
+    --gray-100:   #f3f4f6;
+    --gray-200:   #e5e7eb;
+    --gray-400:   #9ca3af;
+    --gray-500:   #6b7280;
+    --gray-700:   #374151;
+    --gray-900:   #111827;
+    --green:      #10b981;
+    --red:        #ef4444;
+    --red-light:  #fef2f2;
+}
+
+/* ── Contenedor principal ─────────────────────────────────────────────── */
+.la-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Decoración de fondo */
+.la-bg-decoration {
+    position: absolute;
+    top: -200px;
+    right: -200px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(79, 70, 229, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+}
+.la-bg-decoration::after {
+    content: '';
+    position: absolute;
+    bottom: -300px;
+    left: -300px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(249, 115, 22, 0.05) 0%, transparent 70%);
+}
+
+/* ── Card central ─────────────────────────────────────────────────────── */
+.la-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.05),
+        0 20px 40px -12px rgba(79, 70, 229, 0.15);
+    width: 100%;
+    max-width: 460px;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Header con logo ──────────────────────────────────────────────────── */
+.la-header {
+    background: linear-gradient(135deg, var(--indigo-dark) 0%, var(--indigo) 100%);
+    padding: 28px 32px;
+}
+
+.la-logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.la-logo-icon svg {
+    width: 48px;
+    height: 48px;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2));
+}
+
+.la-logo-name {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
+    letter-spacing: -0.3px;
+}
+
+.la-logo-sub {
+    display: block;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 400;
+    margin-top: 1px;
+}
+
+/* ── Cuerpo del formulario ────────────────────────────────────────────── */
+.la-body {
+    padding: 32px 32px 24px;
+}
+
+.la-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 8px 0;
+    letter-spacing: -0.3px;
+}
+
+.la-description {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin: 0 0 28px 0;
+    line-height: 1.6;
+}
+
+/* ── Input texto normal (email, businessName) ─────────────────────────── */
+.la-input-text {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 2px solid var(--gray-200);
+    border-radius: 10px;
+    outline: none;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.la-input-text:focus {
+    border-color: var(--indigo);
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.la-input-text--valid {
+    border-color: var(--green) !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+.la-input-text:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.la-field-hint {
+    margin: 5px 0 0 0;
+    font-size: 12px;
+    color: var(--gray-400);
+    line-height: 1.4;
+}
+
+/* ── Input group spacing ──────────────────────────────────────────────── */
+.la-input-group + .la-input-group {
+    margin-top: 0;
+}
+
+/* ── Error global (fuera del input-group) ────────────────────────────── */
+.la-body > .la-error-msg {
+    margin: -8px 0 16px 0;
+}
+
+/* ── Input de licencia ────────────────────────────────────────────────── */
+.la-input-group {
+    margin-bottom: 24px;
+}
+
+.la-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 8px;
+    letter-spacing: 0.2px;
+}
+
+.la-input {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 18px;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    border: 2px solid var(--gray-200);
+    border-radius: 10px;
+    outline: none;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    transition: all 0.2s ease;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.la-input:focus {
+    border-color: var(--indigo);
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.la-input--error {
+    border-color: var(--red) !important;
+    background: var(--red-light) !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.la-input--valid {
+    border-color: var(--green) !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+.la-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.la-error-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 8px 0 0 0;
+    font-size: 13px;
+    color: var(--red);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.la-valid-msg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 0 0;
+    font-size: 13px;
+    color: var(--green);
+    font-weight: 500;
+}
+
+/* ── Botón principal ──────────────────────────────────────────────────── */
+.la-btn {
+    width: 100%;
+    padding: 14px 24px;
+    background: var(--indigo);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.la-btn:hover:not(:disabled) {
+    background: #4338CA;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.la-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.la-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.la-btn--loading {
+    background: var(--indigo);
+    opacity: 0.85;
+}
+
+/* Spinner */
+.la-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: la-spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes la-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Info box ─────────────────────────────────────────────────────────── */
+.la-info-box {
+    display: flex;
+    gap: 12px;
+    background: var(--indigo-light);
+    border: 1px solid rgba(79, 70, 229, 0.15);
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.la-info-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    color: var(--indigo);
+    margin-top: 1px;
+}
+
+.la-info-text {
+    flex: 1;
+}
+
+.la-info-text p {
+    margin: 0;
+    font-size: 13px;
+    color: #3730a3;
+    line-height: 1.5;
+}
+
+.la-info-text p + p {
+    margin-top: 6px;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+.la-footer {
+    padding: 16px 32px 24px;
+    border-top: 1px solid var(--gray-100);
+    text-align: center;
+}
+
+.la-help-link {
+    font-size: 13px;
+    color: var(--gray-500);
+    text-decoration: none;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+}
+
+.la-help-link:hover {
+    color: var(--indigo);
+}
+
+/* ── Pantalla de éxito ────────────────────────────────────────────────── */
+.la-success {
+    padding: 48px 32px;
+    text-align: center;
+}
+
+.la-success-icon {
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: white;
+    margin: 0 auto 20px;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+    animation: la-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes la-pop {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+.la-success-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 8px 0;
+}
+
+.la-success-msg {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin: 0;
+}
+
+/* ── Reset estilos nativos del navegador en inputs ────────────────────── */
+.la-container input {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .la-card {
+        border-radius: 16px;
+    }
+    .la-header,
+    .la-body,
+    .la-footer {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    .la-input {
+        font-size: 15px;
+        letter-spacing: 1px;
+    }
+}
