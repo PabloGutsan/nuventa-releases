@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: 20
       - name: Install Python setuptools
-        run: pip3 install setuptools
+        run: pip3 install setuptools --break-system-packages
       - name: Install dependencies
         run: npm install
       - name: Build and publish Mac
