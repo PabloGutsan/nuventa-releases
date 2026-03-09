@@ -14,38 +14,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ── Base de datos ───────────────────────────────────────────────────────
     database: {
-        save:        (data)        => ipcRenderer.invoke('db-save', data),
-        load:        ()            => ipcRenderer.invoke('db-load'),
-        query:       (sql, params) => ipcRenderer.invoke('db-query', sql, params),
-        run:         (sql, params) => ipcRenderer.invoke('db-run',   sql, params),
-        get:         (sql, params) => ipcRenderer.invoke('db-get',   sql, params),
-        transaction: (ops)         => ipcRenderer.invoke('db-transaction', ops)
+        save: (data) => ipcRenderer.invoke('db-save', data),
+        load: () => ipcRenderer.invoke('db-load'),
+        query: (sql, params) => ipcRenderer.invoke('db-query', sql, params),
+        run: (sql, params) => ipcRenderer.invoke('db-run', sql, params),
+        get: (sql, params) => ipcRenderer.invoke('db-get', sql, params),
+        transaction: (ops) => ipcRenderer.invoke('db-transaction', ops)
     },
 
     // ── Archivos ─────────────────────────────────────────────────────────────
     files: {
-        save:         (data, defaultPath) => ipcRenderer.invoke('save-file',     data, defaultPath),
-        selectFolder: ()                  => ipcRenderer.invoke('select-folder'),
-        read:         (filePath)          => ipcRenderer.invoke('read-file',     filePath)
+        save: (data, defaultPath) => ipcRenderer.invoke('save-file', data, defaultPath),
+        selectFolder: () => ipcRenderer.invoke('select-folder'),
+        read: (filePath) => ipcRenderer.invoke('read-file', filePath)
     },
 
     // ── Exportación ──────────────────────────────────────────────────────────
     export: {
         toExcel: (data, filename) => ipcRenderer.invoke('export-excel', data, filename),
-        toPDF:   (data, filename) => ipcRenderer.invoke('export-pdf',   data, filename)
+        toPDF: (data, filename) => ipcRenderer.invoke('export-pdf', data, filename)
     },
 
     // ── Backup ───────────────────────────────────────────────────────────────
     backup: {
-        create:  () => ipcRenderer.invoke('create-backup'),
+        create: () => ipcRenderer.invoke('create-backup'),
         restore: () => ipcRenderer.invoke('restore-backup')
     },
 
     // ── Licencia Nuventa ──────────────────────────────────────────────────────
     license: {
-        check:    ()                                => ipcRenderer.invoke('license:check'),
+        check: () => ipcRenderer.invoke('license:check'),
         activate: (licenseKey, email, businessName) => ipcRenderer.invoke('license:activate', licenseKey, email, businessName),
-        clear:    ()                                => ipcRenderer.invoke('license:clear')
+        clear: () => ipcRenderer.invoke('license:clear')
     },
 
     // ── Actualizaciones (electron-updater) ────────────────────────────────────
@@ -60,6 +60,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.on('update:available', handler);
             return () => ipcRenderer.removeListener('update:available', handler);
         },
+
+        getPending: () => ipcRenderer.invoke('update:get-pending'),
 
         onProgress: (callback) => {
             const handler = (_, data) => callback(data);
@@ -91,8 +93,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ── Gaveta de dinero ──────────────────────────────────────────────────────
     cashDrawer: {
-        open:        (printerName) => ipcRenderer.invoke('open-cash-drawer', printerName),
-        getPrinters: ()            => ipcRenderer.invoke('get-printers')
+        open: (printerName) => ipcRenderer.invoke('open-cash-drawer', printerName),
+        getPrinters: () => ipcRenderer.invoke('get-printers')
     }
 
 });

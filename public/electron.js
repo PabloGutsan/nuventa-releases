@@ -13,6 +13,7 @@ const {
 
 let mainWindow;
 let db;
+let pendingUpdate = null; // Guarda la actualización hasta que React esté listo
 
 // Store para preferencias locales (T&C, etc.)
 const appStore = new Store({ name: 'nuventa-app-prefs' });
@@ -36,19 +37,21 @@ function setupAutoUpdater() {
 
     autoUpdater.on('update-available', (info) => {
         console.log('[Updater] Nueva versión disponible:', info.version);
+        pendingUpdate = {
+            hasUpdate:     true,
+            latestVersion: info.version,
+            releaseNotes:  typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
+            isObligatory:  false,
+            autoDownload:  true
+        };
         if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('update:available', {
-                hasUpdate:     true,
-                latestVersion: info.version,
-                releaseNotes:  typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
-                isObligatory:  false,
-                autoDownload:  true
-            });
+            mainWindow.webContents.send('update:available', pendingUpdate);
         }
     });
 
     autoUpdater.on('update-not-available', () => {
         console.log('[Updater] App al día.');
+        pendingUpdate = null;
     });
 
     autoUpdater.on('download-progress', (progress) => {
@@ -60,6 +63,7 @@ function setupAutoUpdater() {
 
     autoUpdater.on('update-downloaded', (info) => {
         console.log('[Updater] Actualización descargada:', info.version);
+        pendingUpdate = null; // Ya descargada, no reenviar el available
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('update:downloaded', {
                 version:      info.version,
@@ -85,6 +89,11 @@ ipcMain.handle('update:check', async () => {
     } catch (error) {
         return { hasUpdate: false };
     }
+});
+
+// Renderer pide el estado actual de la actualización (por si llegó antes de que React montara)
+ipcMain.handle('update:get-pending', () => {
+    return pendingUpdate;
 });
 
 // ============================================================================
@@ -130,7 +139,17 @@ function createWindow() {
             : `file://${path.join(__dirname, '../build/index.html')}`
     );
 
-    mainWindow.once('ready-to-show', () => mainWindow.show());
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
+        // Si la actualización ya fue detectada antes de que React cargara, reenviar
+        if (pendingUpdate) {
+            setTimeout(() => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('update:available', pendingUpdate);
+                }
+            }, 3000); // 3s después de mostrar la ventana para que React esté montado
+        }
+    });
 
     if (isDev) mainWindow.webContents.openDevTools();
 

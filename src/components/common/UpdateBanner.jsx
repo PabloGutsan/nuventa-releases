@@ -1,22 +1,55 @@
 // src/components/common/UpdateBanner.jsx
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import './UpdateBanner.css';
 
+const DISMISS_KEY = 'nuventa_update_dismissed_until';
+
+function wasDismissedToday() {
+    try {
+        const until = localStorage.getItem(DISMISS_KEY);
+        if (!until) return false;
+        return new Date() < new Date(until);
+    } catch {
+        return false;
+    }
+}
+
+function dismissUntilTomorrow() {
+    try {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        localStorage.setItem(DISMISS_KEY, tomorrow.toISOString());
+    } catch {}
+}
+
 const UpdateBanner = () => {
-    const [state, setState]           = useState('idle'); // idle | available | downloading | ready
-    const [updateInfo, setUpdateInfo] = useState(null);
-    const [progress, setProgress]     = useState(0);
-    const [dismissed, setDismissed]   = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false); // diálogo ¿instalar ahora?
+    const { currentUser } = useAuth();
+    const isAdmin = currentUser?.role === 'admin';
+
+    const [state, setState]             = useState('idle');
+    const [updateInfo, setUpdateInfo]   = useState(null);
+    const [progress, setProgress]       = useState(0);
+    const [dismissed, setDismissed]     = useState(() => wasDismissedToday());
+    const [showConfirm, setShowConfirm] = useState(false);
 
     useEffect(() => {
-        if (!window.electronAPI?.update) return;
+        if (!window.electronAPI?.update || !isAdmin) return;
+
+        // Pedir si hay actualización pendiente que llegó antes de que React montara
+        window.electronAPI.invoke('update:get-pending').then((pending) => {
+            if (pending && !wasDismissedToday()) {
+                setUpdateInfo(pending);
+                setState('available');
+            }
+        }).catch(() => {});
 
         const offAvailable = window.electronAPI.update.onAvailable((info) => {
             console.log('[UpdateBanner] Actualización disponible:', info);
+            if (wasDismissedToday()) return;
             setUpdateInfo(info);
             setState('available');
-            setDismissed(false);
         });
 
         const offProgress = window.electronAPI.update.onProgress((data) => {
@@ -29,8 +62,8 @@ const UpdateBanner = () => {
             setUpdateInfo(prev => ({ ...prev, ...data }));
             setState('ready');
             setProgress(100);
-            // Mostrar diálogo de confirmación automáticamente al terminar
             setShowConfirm(true);
+            setDismissed(false); // Siempre mostrar cuando está lista para instalar
         });
 
         return () => {
@@ -38,7 +71,7 @@ const UpdateBanner = () => {
             offProgress?.();
             offDownloaded?.();
         };
-    }, []);
+    }, [isAdmin]);
 
     const handleInstallNow = async () => {
         try {
@@ -51,8 +84,16 @@ const UpdateBanner = () => {
 
     const handleLater = () => {
         setShowConfirm(false);
-        // El banner sigue visible para que puedan instalar después
+        setDismissed(true);
+        dismissUntilTomorrow();
     };
+
+    const handleDismiss = () => {
+        setDismissed(true);
+        dismissUntilTomorrow();
+    };
+
+    if (!isAdmin) return null;
 
     const isObligatory = updateInfo?.isObligatory;
     const version = updateInfo?.version || updateInfo?.latestVersion;
@@ -92,7 +133,7 @@ const UpdateBanner = () => {
 
     if (state === 'idle' || dismissed) return null;
 
-    // ── Banner discreto (available / downloading / ready) ────────────────────
+    // ── Banner discreto ───────────────────────────────────────────────────────
     return (
         <div className={`ub-banner${isObligatory ? ' ub-banner--obligatory' : ''} ub-banner--${state}`}>
             <div className="ub-content">
@@ -144,8 +185,8 @@ const UpdateBanner = () => {
                     {!isObligatory && state !== 'downloading' && (
                         <button
                             className="ub-btn ub-btn--dismiss"
-                            onClick={() => setDismissed(true)}
-                            title="Recordar más tarde"
+                            onClick={handleDismiss}
+                            title="Recordar mañana"
                         >
                             ✕
                         </button>
