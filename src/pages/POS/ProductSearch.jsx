@@ -4,6 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FiSearch, FiPackage, FiX, FiAlertTriangle } from 'react-icons/fi';
 import './ProductSearch.css';
 
+// ── Detección de plataforma ───────────────────────────────────────────────────
+const isMac = () => window.electronAPI?.platform === 'darwin';
+const kbd = (windowsKey, macKey) => isMac() ? macKey : windowsKey;
+
 // ── Helper: restaurar foco (robusto Electron) ─────────────────────────────────
 const restoreFocus = (ref) => {
     if (!ref?.current) return;
@@ -34,60 +38,42 @@ const AlertDialog = ({ message, onClose }) => {
 };
 
 // ── Helpers de stock ──────────────────────────────────────────────────────────
-
-/**
- * Formatea un valor de stock respetando los decimales reales.
- * Nunca usa parseInt ni Math.round — muestra hasta 3 decimales
- * eliminando los ceros finales innecesarios.
- * Ejemplos:  2 → "2"   |   1.5 → "1.5"   |   0.750 → "0.75"
- */
 const formatStock = (value) => {
     const n = parseFloat(value);
     if (isNaN(n)) return '0';
-    // Si es entero exacto, sin decimales; si no, hasta 3 decimales sin ceros finales
     return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '');
 };
 
-/**
- * Devuelve la etiqueta de la unidad para mostrar junto al stock.
- * Prioriza unit_label si es distinto de 'un' (genérico).
- */
 const getUnitLabel = (product) => {
     if (product.unit_label && product.unit_label !== 'un') return product.unit_label;
     const map = { peso: 'kg', volumen: 'L', metros: 'm', unidad: '' };
     return map[product.unit_type] || '';
 };
 
-/** Clase CSS para el badge de stock según nivel */
 const getStockClassName = (product) => {
     if (product.type !== 'product') return '';
     if (product.unlimited_stock === true || product.unlimited_stock === 1) return 'stock-unlimited';
-    const stock    = parseFloat(product.stock)     || 0;   // ← parseFloat (no parseInt)
+    const stock    = parseFloat(product.stock)     || 0;
     const minStock = parseFloat(product.min_stock) || 0;
     if (stock <= 0)        return 'stock-out';
     if (stock <= minStock) return 'stock-low';
     return 'stock-ok';
 };
 
-/**
- * Texto de stock con unidad real.
- * Ejemplos:  "Stock: 1.5 kg"  |  "Stock: 0.75 L"  |  "Stock: 12"  |  "Servicio"
- */
 const getStockText = (product) => {
     if (product.type !== 'product') return 'Servicio';
     if (product.unlimited_stock === true || product.unlimited_stock === 1) return 'Siempre disponible';
-    const stock     = parseFloat(product.stock) || 0;   // ← parseFloat (no parseInt)
+    const stock     = parseFloat(product.stock) || 0;
     const unitLabel = getUnitLabel(product);
     const stockStr  = formatStock(stock);
     return unitLabel ? `Stock: ${stockStr} ${unitLabel}` : `Stock: ${stockStr}`;
 };
 
-/** ¿Tiene stock disponible para agregar al menos una unidad/fracción? */
 const hasAvailableStock = (product) => {
     if (product.type !== 'product') return true;
     if (product.unlimited_stock   === true || product.unlimited_stock   === 1) return true;
     if (product.allow_negative_stock === true || product.allow_negative_stock === 1) return true;
-    return parseFloat(product.stock) > 0;   // ← parseFloat
+    return parseFloat(product.stock) > 0;
 };
 
 // ── ProductSearch ─────────────────────────────────────────────────────────────
@@ -99,7 +85,7 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
 
     const closeAlert = () => {
         setAlertMessage(null);
-        restoreFocus(searchInputRef); // ← foco siempre al input tras cerrar el dialog
+        restoreFocus(searchInputRef);
     };
 
     // ── Fix Electron: recuperar foco automáticamente ──────────────────────────
@@ -114,18 +100,18 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
         };
 
         const handleClick = (e) => {
-            if (e.target.closest('.search-results'))  return;
-            if (e.target.closest('.ps-alert-overlay')) return; // ← nuevo: no robar foco del dialog
-            if (e.target.closest('.modal-overlay'))   return;
-            if (e.target.closest('.cm-overlay'))      return;
-            if (e.target.closest('.cc-overlay'))      return;
-            if (e.target.closest('.co-overlay'))      return;
-            if (e.target.closest('.pos-dialog-overlay')) return; // ← dialog del POSMain
-            if (e.target.closest('.cart-sidebar'))    return;
-            if (e.target.closest('button'))           return;
-            if (e.target.closest('input'))            return;
-            if (e.target.closest('select'))           return;
-            if (e.target.closest('textarea'))         return;
+            if (e.target.closest('.search-results'))     return;
+            if (e.target.closest('.ps-alert-overlay'))   return;
+            if (e.target.closest('.modal-overlay'))      return;
+            if (e.target.closest('.cm-overlay'))         return;
+            if (e.target.closest('.cc-overlay'))         return;
+            if (e.target.closest('.co-overlay'))         return;
+            if (e.target.closest('.pos-dialog-overlay')) return;
+            if (e.target.closest('.cart-sidebar'))       return;
+            if (e.target.closest('button'))              return;
+            if (e.target.closest('input'))               return;
+            if (e.target.closest('select'))              return;
+            if (e.target.closest('textarea'))            return;
             setTimeout(() => searchInputRef.current?.focus(), 50);
         };
 
@@ -194,15 +180,13 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                 const isUnlimited   = product.unlimited_stock   === true || product.unlimited_stock   === 1;
                 const allowNegative = product.allow_negative_stock === true || product.allow_negative_stock === 1;
                 if (!isUnlimited && !allowNegative) {
-                    const stock     = parseFloat(product.stock) || 0;   // ← parseFloat (clave del fix)
+                    const stock     = parseFloat(product.stock) || 0;
                     const unitLabel = getUnitLabel(product);
                     if (stock <= 0) {
-                        // Dialog React en lugar de window.alert → no bloquea el hilo
-                        // → los inputs NO quedan pegados tras cerrar
                         setAlertMessage(
                             `"${product.name}" no tiene stock disponible.\n\nStock actual: ${formatStock(stock)}${unitLabel ? ' ' + unitLabel : ''}`
                         );
-                        return; // NO agrega al carrito; foco vuelve al input al cerrar el dialog
+                        return;
                     }
                 }
             }
@@ -291,14 +275,12 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                                         {product.type === 'service' && (
                                             <span className="service-badge">SERVICIO</span>
                                         )}
-                                        {/* Badge visual cuando no hay stock */}
                                         {sinStock && (
                                             <span className="no-stock-badge">SIN STOCK</span>
                                         )}
                                     </div>
                                     <div className="result-details">
                                         {product.sku && <span>SKU: {product.sku}</span>}
-                                        {/* Stock con decimales reales y unidad */}
                                         <span className={getStockClassName(product)}>
                                             {getStockText(product)}
                                         </span>
@@ -331,15 +313,13 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                         <div className="tip"><strong>↑↓</strong> Navegar resultados</div>
                         <div className="tip"><strong>Enter</strong> Agregar al carrito</div>
                         <div className="tip"><strong>ESC</strong> Limpiar búsqueda</div>
-                        <div className="tip"><strong>F9</strong> Pagar</div>
-                        <div className="tip"><strong>F10</strong> Limpiar carrito</div>
+                        <div className="tip"><strong>{kbd('F9', '⌘P')}</strong> Pagar</div>
+                        <div className="tip"><strong>{kbd('F10', '⌘⌫')}</strong> Limpiar carrito</div>
                     </div>
                 </div>
             )}
 
             {/* ── Alert Dialog React ── */}
-            {/* Reemplaza window.alert: no bloquea el hilo de JS de Electron,
-                los inputs NO quedan pegados al cerrarlo */}
             {alertMessage && <AlertDialog message={alertMessage} onClose={closeAlert} />}
         </div>
     );

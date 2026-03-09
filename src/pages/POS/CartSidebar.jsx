@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     FiTrash2, FiMinus, FiPlus, FiShoppingCart,
-    FiCreditCard, FiUser, FiUserPlus, FiSearch, FiX
+    FiCreditCard, FiUser, FiUserPlus, FiSearch, FiX,
+    FiPause, FiPlay, FiClock,
 } from 'react-icons/fi';
 import { useDatabase } from '../../context/DatabaseContext';
 import CustomerRepository from '../../services/repositories/customerRepository';
 import QuickAddCustomerModal from './QuickAddCustomerModal';
 import Button from '../../components/common/Button';
 import './CartSidebar.css';
+
+// ── Detección de plataforma ───────────────────────────────────────────────────
+const isMac = () => window.electronAPI?.platform === 'darwin';
+const kbd = (windowsKey, macKey) => isMac() ? macKey : windowsKey;
 
 const CartSidebar = ({
     items,
@@ -19,7 +24,12 @@ const CartSidebar = ({
     onRemove,
     onClear,
     onPay,
-    isProcessing = false
+    isProcessing = false,
+    // Ventas en espera
+    holds        = [],
+    onHold,
+    onResumeHold,
+    onDeleteHold,
 }) => {
     const { db } = useDatabase();
     const [allCustomers,   setAllCustomers]   = useState([]);
@@ -29,6 +39,7 @@ const CartSidebar = ({
     const [editingItemId,  setEditingItemId]  = useState(null);
     const [editValue,      setEditValue]      = useState('');
     const [showQuickAdd,   setShowQuickAdd]   = useState(false);
+    const [showHoldsPanel, setShowHoldsPanel] = useState(false);
 
     const wrapperRef   = useRef(null);
     const searchRef    = useRef(null);
@@ -44,6 +55,11 @@ const CartSidebar = ({
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    // Cerrar panel si ya no hay holds
+    useEffect(() => {
+        if (holds.length === 0) setShowHoldsPanel(false);
+    }, [holds]);
 
     const loadCustomers = async () => {
         try {
@@ -99,11 +115,9 @@ const CartSidebar = ({
         return Math.round(Math.max(0, unitPrice * quantity - discount));
     };
 
-    // Precios CLP: sin decimales, punto como separador de miles
     const formatCurrency = (value) =>
         new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(value) || 0);
 
-    // Cantidades: hasta 3 decimales, coma como separador decimal (ej: 2,5 kg | 1.099 un)
     const formatQuantity = (item) => {
         const quantity  = parseFloat(item.quantity) || 0;
         const unitLabel = item.unit_label || 'un';
@@ -137,7 +151,7 @@ const CartSidebar = ({
 
     const saveEdit = (productId) => {
         const num = parseFloat(editValue);
-        if (isNaN(num) || num <= 0) { alert('⚠️ Ingresa una cantidad válida mayor a 0'); return; }
+        if (isNaN(num) || num <= 0) { alert('Ingresa una cantidad válida mayor a 0'); return; }
         onUpdateQuantity(productId, num);
         cancelEditing();
     };
@@ -147,14 +161,95 @@ const CartSidebar = ({
         if (e.key === 'Escape') { e.preventDefault(); cancelEditing(); }
     };
 
+    // ── Helpers de holds ──────────────────────────────────────────────────────
+    const getHoldCustomerName = (hold) => {
+        if (!hold.customerId) return null;
+        return allCustomers.find(c => c.id === hold.customerId)?.full_name || null;
+    };
+
+    const getHoldTotal = (hold) =>
+        hold.cart.reduce((sum, item) => {
+            const unitPrice = parseFloat(item.unit_price) || 0;
+            const quantity  = parseFloat(item.quantity)   || 0;
+            const discount  = parseFloat(item.discount)   || 0;
+            return sum + Math.max(0, unitPrice * quantity - discount);
+        }, 0);
+
+    const formatHoldTime = (savedAt) =>
+        new Date(savedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
     // ── Render ────────────────────────────────────────────────────────────────
     return (
         <>
             <div className="cart-sidebar">
+
+                {/* ── Header ── */}
                 <div className="cart-sidebar-header">
-                    <FiShoppingCart size={20} />
-                    <h3>Carrito ({items.length})</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FiShoppingCart size={20} />
+                        <h3>Carrito ({items.length})</h3>
+                    </div>
+
+                    {holds.length > 0 && (
+                        <button
+                            className={`holds-toggle-btn${showHoldsPanel ? ' holds-toggle-btn--active' : ''}`}
+                            onClick={() => setShowHoldsPanel(v => !v)}
+                            title="Ver ventas en espera"
+                        >
+                            <FiClock size={13} />
+                            <span>En espera</span>
+                            <span className="holds-badge">{holds.length}</span>
+                        </button>
+                    )}
                 </div>
+
+                {/* ── Panel de ventas en espera ── */}
+                {showHoldsPanel && holds.length > 0 && (
+                    <div className="holds-panel">
+                        <div className="holds-panel-title">
+                            <FiClock size={12} />
+                            Ventas pausadas
+                        </div>
+                        {holds.map((hold, idx) => {
+                            const customerName = getHoldCustomerName(hold);
+                            const holdTotal    = getHoldTotal(hold);
+                            const itemsCount   = hold.cart.length;
+                            return (
+                                <div key={hold.id} className="hold-item">
+                                    <div className="hold-item-info">
+                                        <div className="hold-item-top">
+                                            <span className="hold-item-label">
+                                                {customerName || `Venta #${idx + 1}`}
+                                            </span>
+                                            <span className="hold-item-time">
+                                                {formatHoldTime(hold.savedAt)}
+                                            </span>
+                                        </div>
+                                        <div className="hold-item-meta">
+                                            {itemsCount} {itemsCount === 1 ? 'producto' : 'productos'} · ${formatCurrency(holdTotal)}
+                                        </div>
+                                    </div>
+                                    <div className="hold-item-actions">
+                                        <button
+                                            className="hold-btn hold-btn--resume"
+                                            onClick={() => { onResumeHold(hold.id); setShowHoldsPanel(false); }}
+                                            title="Retomar esta venta"
+                                        >
+                                            <FiPlay size={11} />
+                                        </button>
+                                        <button
+                                            className="hold-btn hold-btn--delete"
+                                            onClick={() => onDeleteHold(hold.id)}
+                                            title="Eliminar esta espera"
+                                        >
+                                            <FiX size={11} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
                 {/* ── Selector de Cliente ── */}
                 <div className="cart-customer">
@@ -350,11 +445,22 @@ const CartSidebar = ({
 
                 {/* ── Acciones ── */}
                 <div className="cart-sidebar-actions">
+                    {items.length > 0 && onHold && (
+                        <button
+                            className="hold-action-btn"
+                            onClick={onHold}
+                            disabled={isProcessing}
+                            title="Pausar esta venta y atender otro cliente"
+                        >
+                            <FiPause size={13} />
+                            Poner en espera
+                        </button>
+                    )}
                     <Button variant="danger" size="small" onClick={onClear} disabled={items.length === 0 || isProcessing} fullWidth>
-                        Limpiar (F10)
+                        Limpiar ({kbd('F10', '⌘⌫')})
                     </Button>
                     <Button variant="success" icon={<FiCreditCard />} onClick={onPay} disabled={items.length === 0 || isProcessing} loading={isProcessing} fullWidth>
-                        {isProcessing ? 'Procesando...' : 'Pagar (F9)'}
+                        {isProcessing ? 'Procesando...' : `Pagar (${kbd('F9', '⌘P')})`}
                     </Button>
                 </div>
             </div>

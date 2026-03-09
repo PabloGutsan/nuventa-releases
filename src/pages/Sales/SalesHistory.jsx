@@ -17,7 +17,6 @@ import './SalesHistory.css';
 
 const PAGE_SIZE = 20;
 
-// ── Helper: restaurar foco tras cerrar dialogs/modales (robusto Electron) ─────
 const restoreFocus = (ref) => {
     if (!ref?.current) return;
     ref.current.focus();
@@ -26,7 +25,6 @@ const restoreFocus = (ref) => {
     );
 };
 
-// ── Componente estadística ─────────────────────────────────────────────────────
 const StatCard = ({ accent, icon: Icon, label, value, sub, valueColor }) => (
     <div className="stat-card-a" style={{ '--sc-accent': accent }}>
         <div className="sca-icon">
@@ -42,9 +40,6 @@ const StatCard = ({ accent, icon: Icon, label, value, sub, valueColor }) => (
     </div>
 );
 
-// ── Dialog React ───────────────────────────────────────────────────────────────
-// Reemplaza window.alert, window.confirm y window.prompt
-// mode: 'alert' | 'confirm' | 'prompt'
 const SHDialog = ({ dialog, onClose }) => {
     const [inputValue, setInputValue] = useState('');
     const textareaRef = useRef(null);
@@ -122,7 +117,6 @@ const SHDialog = ({ dialog, onClose }) => {
     );
 };
 
-// ── SalesHistory ───────────────────────────────────────────────────────────────
 const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
     const { db } = useDatabase();
     const { currentUser: authUser } = useAuth();
@@ -150,7 +144,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
     const [showDetailModal, setShowDetailModal]   = useState(false);
     const [cancelTarget, setCancelTarget]         = useState(null);
 
-    // ── Dialog React ──────────────────────────────────────────────────────────
     const [dialog, setDialog] = useState(null);
     const searchRef = useRef(null);
 
@@ -276,24 +269,36 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
 
     const hasActiveFilter = searchTerm.trim() !== '' || paymentMethod !== 'all' || sellerFilter !== 'all';
 
-    const filteredStats = useMemo(() => {
-        if (!hasActiveFilter) return null;
-        const active    = sales.filter(s => !s.is_cancelled);
-        const revenue   = active.reduce((a, s) => a + (s.total || 0), 0);
-        const cancelled = sales.filter(s => s.is_cancelled).length;
+    // ── displayStats: calculado desde el array cargado ─────────────────────────
+    // Modo normal (showCancelled=false): stats de ventas activas
+    // Modo canceladas (showCancelled=true): stats de ventas canceladas del período
+    const displayStats = useMemo(() => {
+        if (showCancelled) {
+            // El array contiene solo canceladas → mostrar sus métricas
+            const revenue = sales.reduce((a, s) => a + (s.total || 0), 0);
+            return {
+                total_sales:     sales.length,
+                total_revenue:   revenue,
+                average_ticket:  sales.length > 0 ? revenue / sales.length : 0,
+                cancelled_sales: sales.length,
+            };
+        }
+        // Modo normal: excluir canceladas del conteo y revenue
+        const active  = sales.filter(s => !s.is_cancelled);
+        const revenue = active.reduce((a, s) => a + (s.total || 0), 0);
         return {
             total_sales:     active.length,
             total_revenue:   revenue,
             average_ticket:  active.length > 0 ? revenue / active.length : 0,
-            cancelled_sales: cancelled,
+            cancelled_sales: hasActiveFilter
+                ? sales.filter(s => s.is_cancelled).length
+                : stats.cancelled_sales,
         };
-    }, [sales, hasActiveFilter]);
+    }, [sales, stats.cancelled_sales, hasActiveFilter, showCancelled]);
 
-    const displayStats = filteredStats || stats;
-    const totalPages   = Math.max(1, Math.ceil(sales.length / PAGE_SIZE));
-    const pagedSales   = sales.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(sales.length / PAGE_SIZE));
+    const pagedSales = sales.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-    // ── Ver detalle ───────────────────────────────────────────────────────────
     const handleViewDetail = async (sale) => {
         try {
             const detail = await saleRepo.getSaleById(sale.id);
@@ -308,9 +313,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
         }
     };
 
-    // ── Cancelar venta ────────────────────────────────────────────────────────
-    // Admin: Dialog React de 2 pasos (motivo → confirmación)
-    // Vendedor: usa CancelSaleModal con autenticación de admin
     const handleCancelClick = useCallback((sale) => {
         if (sale.is_cancelled) {
             showAlert('Esta venta ya está cancelada.', 'primary');
@@ -318,12 +320,10 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
         }
 
         if (!isAdmin) {
-            // Vendedor: requiere autorización de admin → CancelSaleModal
             setCancelTarget(sale);
             return;
         }
 
-        // Admin: paso 1 — pedir motivo
         setDialog({
             mode:           'prompt',
             title:          `Cancelar venta ${sale.sale_number}`,
@@ -332,7 +332,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
             confirmVariant: 'danger',
             onCancel:       closeDialog,
             onConfirm:      (reason) => {
-                // Paso 2 — confirmar con resumen
                 setDialog({
                     mode:           'confirm',
                     title:          'Confirmar cancelación',
@@ -356,7 +355,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
         });
     }, [isAdmin, saleRepo, currentUser, closeDialog, showAlert]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Cancelación desde CancelSaleModal (vendedor con auth de admin) ────────
     const handleCancelConfirm = async (sale, reason) => {
         try {
             await saleRepo.cancelSale(sale.id, currentUser.id, reason);
@@ -370,7 +368,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
         }
     };
 
-    // ── Exportación ───────────────────────────────────────────────────────────
     const handleExport = async (type) => {
         if (!sales.length) return;
         setExporting(type);
@@ -396,7 +393,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
         }
     };
 
-    // ── Formateadores ─────────────────────────────────────────────────────────
     const formatCurrency = (v) =>
         new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(v || 0);
 
@@ -411,12 +407,10 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
         sin_documento: 'Sin Documento',
     }[t] || t);
 
-    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="main-content-scrollable">
             <div className="sales-history">
 
-                {/* ── HEADER ── */}
                 <div className="page-header">
                     <div>
                         <h1 className="page-title">
@@ -457,7 +451,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                     </div>
                 </div>
 
-                {/* ── Avisos de filtro ── */}
                 {isOwnOnly && (
                     <div className="sh-filter-notice">
                         📅 Mostrando solo tus ventas del día de hoy.
@@ -472,12 +465,16 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                     </div>
                 )}
 
-                {/* ── STATS ── */}
                 <div className="sales-stats-grid">
                     <StatCard accent="#2563eb" icon={FiShoppingCart}
-                        label="Total Ventas" value={displayStats.total_sales} sub="En el período" />
-                    <StatCard accent="#10b981" icon={FiDollarSign}
-                        label="Ingresos Totales" value={formatCurrency(displayStats.total_revenue)} sub="Sin canceladas" />
+                        label={showCancelled ? 'Ventas Canceladas' : 'Total Ventas'}
+                        value={displayStats.total_sales}
+                        sub="En el período" />
+                    <StatCard accent={showCancelled ? '#ef4444' : '#10b981'} icon={FiDollarSign}
+                        label={showCancelled ? 'Monto Cancelado' : 'Ingresos Totales'}
+                        value={formatCurrency(displayStats.total_revenue)}
+                        sub={showCancelled ? 'Total anulado' : 'Sin canceladas'}
+                        valueColor={showCancelled ? '#ef4444' : undefined} />
                     <StatCard accent="#f59e0b" icon={FiTrendingUp}
                         label="Ticket Promedio" value={formatCurrency(displayStats.average_ticket)} sub="Por transacción" />
                     <StatCard accent="#ef4444" icon={FiXCircle}
@@ -486,7 +483,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                         sub="En el período" />
                 </div>
 
-                {/* ── FILTROS ── */}
                 <Card>
                     <div className="filters-section">
                         <div className="filters-row">
@@ -552,7 +548,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                     </div>
                 </Card>
 
-                {/* ── TABLA ── */}
                 <Card>
                     <div className="table-container">
                         {loading ? (
@@ -650,7 +645,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                                     </tbody>
                                 </table>
 
-                                {/* ── Paginación ── */}
                                 {totalPages > 1 && (
                                     <div className="sh-pagination">
                                         <button className="sh-page-btn"
@@ -695,7 +689,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                     </div>
                 </Card>
 
-                {/* ── Modal de detalle ── */}
                 {showDetailModal && selectedSale && (
                     <SaleDetailModal
                         sale={selectedSale}
@@ -711,7 +704,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                     />
                 )}
 
-                {/* ── Modal de cancelación con auth (vendedor no-admin) ── */}
                 {cancelTarget && (
                     <CancelSaleModal
                         sale={cancelTarget}
@@ -724,7 +716,6 @@ const SalesHistory = ({ salesFilter = 'all', currentUser: userProp }) => {
                     />
                 )}
 
-                {/* ── Dialog React: reemplaza window.alert / confirm / prompt ── */}
                 <SHDialog dialog={dialog} onClose={closeDialog} />
 
             </div>

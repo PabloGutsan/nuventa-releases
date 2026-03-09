@@ -14,6 +14,9 @@ import {
 } from 'react-icons/fi';
 import './ProductList.css';
 
+// ── Detección de plataforma ───────────────────────────────────────────────────
+const isMac = () => window.electronAPI?.platform === 'darwin';
+
 // ── Helper: restaurar foco al input de búsqueda ───────────────────────────────
 const restoreFocus = (ref) => {
     requestAnimationFrame(() => {
@@ -28,7 +31,6 @@ const PlDialog = ({ dialog, onClose }) => {
     const isConfirm = dialog.type === 'confirm';
     const isSuccess = dialog.type === 'success';
     const handleOverlayClick = (e) => {
-        // Solo cerrar al hacer clic en el overlay si NO es confirm
         if (!isConfirm && e.target === e.currentTarget) {
             dialog.onClose?.();
         }
@@ -84,7 +86,6 @@ const ProductList = () => {
     const [exporting,         setExporting]         = useState(null);
     const [dialog,            setDialog]            = useState(null);
 
-    // ── NUEVO: compras ────────────────────────────────────────────────────────
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [suppliers,         setSuppliers]         = useState([]);
 
@@ -98,7 +99,10 @@ const ProductList = () => {
 
     useEffect(() => {
         const handleKeyPress = (e) => {
-            if (e.key === 'F2') { e.preventDefault(); activateScanner(); }
+            // F2 en Windows/Linux | Cmd+B en Mac (F2 = brillo en Mac)
+            const isActivate = e.key === 'F2' ||
+                (isMac() && e.metaKey && e.key === 'b');
+            if (isActivate) { e.preventDefault(); activateScanner(); }
         };
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
@@ -166,7 +170,6 @@ const ProductList = () => {
         }
     };
 
-    // ── NUEVO: cargar proveedores activos ─────────────────────────────────────
     const loadSuppliers = async () => {
         try {
             const data = await window.electronAPI.database.query(
@@ -196,8 +199,6 @@ const ProductList = () => {
         }
         setFilteredProducts(filtered);
     };
-
-
 
     const handleExport = async (type) => {
         setExporting(type);
@@ -319,6 +320,9 @@ const ProductList = () => {
 
     const stats = getStats();
 
+    // Label del botón scanner según plataforma
+    const scannerLabel = isMac() ? 'Scanner (⌘B)' : 'Scanner (F2)';
+
     if (loading) {
         return (
             <div className="main-content-scrollable">
@@ -339,7 +343,7 @@ const ProductList = () => {
                 {/* 1. HEADER */}
                 <div className="page-header">
                     <div>
-                        <h1 className="page-title">Inventario de Productos y Servicios</h1>
+                        <h1 className="page-title">Inventario</h1>
                         <p className="page-subtitle">Gestiona tu catálogo de productos y servicios</p>
                     </div>
                     <div className="pl-header-actions">
@@ -364,7 +368,6 @@ const ProductList = () => {
                             Actualizar
                         </button>
 
-                        {/* ── NUEVO: botón Registrar Compra ── */}
                         <button
                             className="rp-btn-export pl-btn-purchase"
                             onClick={() => setShowPurchaseModal(true)}
@@ -375,7 +378,7 @@ const ProductList = () => {
                         </button>
 
                         <Button variant="primary" icon={<FiPlus />} onClick={handleCreateProduct}>
-                            Nuevo Producto o Servicio
+                            Nuevo Producto/Servicio
                         </Button>
                     </div>
                 </div>
@@ -400,7 +403,6 @@ const ProductList = () => {
                             <div className="stat-label">Productos con Stock Bajo</div>
                         </div>
                     </div>
-
                 </div>
 
                 {/* 3. TOOLBAR */}
@@ -499,7 +501,7 @@ const ProductList = () => {
                     </div>
 
                     <Button variant="secondary" icon={<FiCreditCard />} onClick={activateScanner}>
-                        Scanner (F2)
+                        {scannerLabel}
                     </Button>
                 </div>
 
@@ -635,7 +637,7 @@ const ProductList = () => {
                     />
                 )}
 
-                {/* ── NUEVO: Modal Registrar Compra ── */}
+                {/* Modal Registrar Compra */}
                 {showPurchaseModal && (
                     <PurchaseOrderModal
                         allProducts={products}

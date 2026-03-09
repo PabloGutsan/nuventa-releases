@@ -22,6 +22,51 @@ import CashButton from './CashButton';
 
 import './POSMain.css';
 
+// ── Borrador de carrito ───────────────────────────────────────────────────────
+const DRAFT_KEY = 'nuventa_pos_draft';
+
+const saveDraft = (cart, customerId) => {
+    try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+            cart,
+            customerId,
+            savedAt: new Date().toISOString(),
+        }));
+    } catch (e) { console.warn('No se pudo guardar borrador:', e); }
+};
+
+const loadDraft = () => {
+    try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return null;
+        const draft = JSON.parse(raw);
+        if (!draft?.cart?.length) return null;
+        return draft;
+    } catch { return null; }
+};
+
+const clearDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
+};
+
+// ── Ventas en espera ──────────────────────────────────────────────────────────
+const HOLDS_KEY = 'nuventa_pos_holds';
+const MAX_HOLDS = 5;
+
+const getStoredHolds = () => {
+    try { return JSON.parse(localStorage.getItem(HOLDS_KEY) || '[]'); } catch { return []; }
+};
+const storeHolds = (holds) => {
+    try { localStorage.setItem(HOLDS_KEY, JSON.stringify(holds)); } catch {}
+};
+
+// ── Detección de plataforma ───────────────────────────────────────────────────
+const isMac = () => window.electronAPI?.platform === 'darwin';
+
+// Retorna el label correcto según plataforma
+// windowsKey: texto para Windows/Linux, macKey: texto para Mac
+const kbd = (windowsKey, macKey) => isMac() ? macKey : windowsKey;
+
 // ── Helper: restaurar foco al input de búsqueda ───────────────────────────────
 const restoreSearchFocus = (ref) => {
     requestAnimationFrame(() => {
@@ -112,11 +157,21 @@ const POSMain = ({ onNavigate }) => {
     const [successMessage,   setSuccessMessage]   = useState('');
 
     // ── Configuración de límites de caja ──────────────────────────────────────
-    // Se carga desde system_settings y se pasa a CashButton para mostrar alertas
     const [cashSettings, setCashSettings] = useState(null);
 
     // ── Dialog React ──────────────────────────────────────────────────────────
     const [dialog, setDialog] = useState(null);
+
+    // ── Ventas en espera ──────────────────────────────────────────────────────
+    const [holds, setHoldsState] = useState(() => getStoredHolds());
+
+    // ── Guardar borrador en cada cambio del carrito ───────────────────────────
+    // Solo guarda cuando hay items. Nunca borra desde aquí para no
+    // interferir con initializePOS al montar. El clearDraft() se llama
+    // explícitamente en handleClearCart y handleCompleteSale.
+    useEffect(() => {
+        if (cart.length > 0) saveDraft(cart, customerId);
+    }, [cart, customerId]);
 
     const searchInputRef = useRef(null);
 
@@ -138,6 +193,58 @@ const POSMain = ({ onNavigate }) => {
             onConfirm: () => { setDialog(null); onConfirm(); },
             onCancel:  () => { setDialog(null); restoreSearchFocus(searchInputRef); },
         });
+    }, []);
+
+    // ── Handlers de ventas en espera ──────────────────────────────────────────
+    const handleHold = useCallback(() => {
+        if (cart.length === 0) return;
+        const current = getStoredHolds();
+        if (current.length >= MAX_HOLDS) {
+            showAlert(`Máximo ${MAX_HOLDS} ventas en espera simultáneas.\n\nRetoma o elimina alguna antes de pausar otra.`, 'danger');
+            return;
+        }
+        const updated = [...current, {
+            id:         Date.now(),
+            cart,
+            customerId,
+            savedAt:    new Date().toISOString(),
+        }];
+        storeHolds(updated);
+        setHoldsState(updated);
+        clearDraft();
+        setCart([]);
+        setCustomerId(null);
+        restoreSearchFocus(searchInputRef);
+    }, [cart, customerId, showAlert]);
+
+    const handleResumeHold = useCallback((holdId) => {
+        const current = getStoredHolds();
+        const hold    = current.find(h => h.id === holdId);
+        if (!hold) return;
+
+        let updated;
+        if (cart.length > 0) {
+            // Auto-pausar el carrito actual antes de retomar
+            updated = [
+                ...current.filter(h => h.id !== holdId),
+                { id: Date.now(), cart, customerId, savedAt: new Date().toISOString() },
+            ];
+        } else {
+            updated = current.filter(h => h.id !== holdId);
+        }
+
+        storeHolds(updated);
+        setHoldsState(updated);
+        setCart(hold.cart);
+        setCustomerId(hold.customerId);
+        clearDraft();
+        restoreSearchFocus(searchInputRef);
+    }, [cart, customerId]);
+
+    const handleDeleteHold = useCallback((holdId) => {
+        const updated = getStoredHolds().filter(h => h.id !== holdId);
+        storeHolds(updated);
+        setHoldsState(updated);
     }, []);
 
     const productRepo  = new ProductRepository(db);
@@ -163,11 +270,20 @@ const POSMain = ({ onNavigate }) => {
     useEffect(() => {
         const handleKeyPress = (e) => {
             if (showPaymentModal || showPrintModal || showQuantityModal || dialog) return;
-            if (e.key === 'F9' && cart.length > 0 && !isProcessingSale) {
+
+            const mac = isMac();
+
+            // Pagar: F9 en Windows/Linux | Cmd+P en Mac
+            const isPay = e.key === 'F9' || (mac && e.metaKey && e.key === 'p');
+
+            // Limpiar carrito: F10 en Windows/Linux | Cmd+Backspace en Mac
+            const isClear = e.key === 'F10' || (mac && e.metaKey && e.key === 'Backspace');
+
+            if (isPay && cart.length > 0 && !isProcessingSale) {
                 e.preventDefault();
                 handleOpenPayment();
             }
-            if (e.key === 'F10') {
+            if (isClear) {
                 e.preventDefault();
                 handleClearCart();
             }
@@ -186,9 +302,36 @@ const POSMain = ({ onNavigate }) => {
             await Promise.all([
                 loadBusinessInfo(),
                 loadProducts(),
-                loadCashSettings(),   // ← carga límites de caja
+                loadCashSettings(),
             ]);
             requestAnimationFrame(() => searchInputRef.current?.focus());
+
+            // ── Recuperar borrador si existe ──────────────────────────────────
+            const draft = loadDraft();
+            if (draft) {
+                const savedAt  = new Date(draft.savedAt);
+                const timeStr  = savedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                const dateStr  = savedAt.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+                const itemsStr = draft.cart.length === 1 ? '1 producto' : `${draft.cart.length} productos`;
+                setDialog({
+                    mode:           'confirm',
+                    message:        `Tienes un carrito guardado del ${dateStr} a las ${timeStr} con ${itemsStr}.\n\n¿Deseas recuperarlo?`,
+                    confirmLabel:   'Recuperar carrito',
+                    confirmVariant: 'primary',
+                    onConfirm: () => {
+                        setCart(draft.cart);
+                        setCustomerId(draft.customerId || null);
+                        clearDraft();
+                        setDialog(null);
+                        restoreSearchFocus(searchInputRef);
+                    },
+                    onCancel: () => {
+                        clearDraft();
+                        setDialog(null);
+                        restoreSearchFocus(searchInputRef);
+                    },
+                });
+            }
         } catch (error) {
             console.error('❌ Error inicializando POS:', error);
         } finally {
@@ -210,7 +353,6 @@ const POSMain = ({ onNavigate }) => {
                 withdrawalAmount: parseInt(withdrawalRow?.value || '300000'),
             });
         } catch {
-            // Si falla usar defaults
             setCashSettings({ limitAlert: 350000, withdrawalAmount: 300000 });
         }
     };
@@ -423,6 +565,7 @@ const POSMain = ({ onNavigate }) => {
             onConfirm: () => {
                 setCart([]);
                 setCustomerId(null);
+                clearDraft(); // limpiar también borra el borrador guardado
                 restoreSearchFocus(searchInputRef);
             },
         });
@@ -534,6 +677,7 @@ const POSMain = ({ onNavigate }) => {
 
             const completedSaleId = result.saleId;
 
+            clearDraft(); // venta completada → borrador ya no se necesita
             setCart([]);
             setCustomerId(null);
             setShowPaymentModal(false);
@@ -557,8 +701,6 @@ const POSMain = ({ onNavigate }) => {
             }, 100);
 
             setTimeout(() => loadProducts(), 200);
-            // Actualizar efectivo estimado en caja para reflejar la venta
-            // y disparar la alerta de retiro si corresponde
             if (register?.id) setTimeout(() => loadCashData(register.id), 300);
 
         } catch (error) {
@@ -621,11 +763,10 @@ const POSMain = ({ onNavigate }) => {
                             <p className="pos-subtitle">
                                 Busca y agrega productos al carrito
                                 <span className="keyboard-hints">
-                                    F9: Pagar | F10: Limpiar | ESC: Buscar
+                                    {kbd('F9', '⌘P')}: Pagar | {kbd('F10', '⌘⌫')}: Limpiar | ESC: Buscar
                                 </span>
                             </p>
                         </div>
-                        {/* CashButton recibe expectedCash y cashSettings para mostrar alerta de exceso */}
                         <CashButton
                             register={register}
                             onMovement={openMovementModal}
@@ -654,6 +795,10 @@ const POSMain = ({ onNavigate }) => {
                 onClear={handleClearCart}
                 onPay={handleOpenPayment}
                 isProcessing={isProcessingSale}
+                holds={holds}
+                onHold={handleHold}
+                onResumeHold={handleResumeHold}
+                onDeleteHold={handleDeleteHold}
             />
 
             {/* ── Modales generales ── */}
@@ -731,8 +876,6 @@ const POSMain = ({ onNavigate }) => {
                     }}
                     onConfirmClose={async (data) => {
                         await handleClose(data);
-                        // NO cerramos el modal aquí — el modal muestra la pantalla
-                        // de éxito con opción de imprimir y se cierra solo después
                     }}
                 />
             )}

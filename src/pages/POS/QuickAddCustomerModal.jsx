@@ -30,6 +30,9 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
     });
     const [errors,         setErrors]         = useState({});
     const [saving,         setSaving]         = useState(false);
+    const [savedOk,        setSavedOk]        = useState(false);
+    const [savedCustomer,  setSavedCustomer]  = useState(null); // datos para pasar a onCreated
+    const [saveError,      setSaveError]      = useState('');
     const [comunas,        setComunas]        = useState([]);
     const [companyComunas, setCompanyComunas] = useState([]);
 
@@ -38,17 +41,15 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
     // FIX: bloquear scroll al montar, limpiarlo siempre al desmontar
     useEffect(() => {
         document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = '';
-        };
+        return () => { document.body.style.overflow = ''; };
     }, []);
 
     // ESC cierra modal — FIX: usa handleClose para limpiar overflow
     useEffect(() => {
-        const onKey = (e) => { if (e.key === 'Escape' && !saving) handleClose(); };
+        const onKey = (e) => { if (e.key === 'Escape' && !saving && !savedOk) handleClose(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [saving, onClose]);
+    }, [saving, savedOk, onClose]);
 
     // Cascada: región → comunas persona
     useEffect(() => {
@@ -70,6 +71,7 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
         if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
+        if (saveError)     setSaveError('');
     };
 
     const isValidEmail = (email) =>
@@ -122,7 +124,9 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
         else if (formData.full_name.trim().length < 3)
             e.full_name = 'Mínimo 3 caracteres';
 
-        if (formData.phone?.trim() && formData.phone.trim().length < 8)
+        if (!formData.phone?.trim())
+            e.phone = 'El teléfono es obligatorio';
+        else if (formData.phone.trim().length < 8)
             e.phone = 'Mínimo 8 dígitos';
 
         if (formData.email?.trim() && !isValidEmail(formData.email.trim()))
@@ -150,6 +154,7 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
         ev.preventDefault();
         if (!validateForm()) return;
         setSaving(true);
+        setSaveError('');
         try {
             if (!db) throw new Error('Base de datos no disponible');
 
@@ -164,27 +169,30 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                 birth_date:      formData.birth_date              || null,
                 notes:           formData.notes?.trim()           || null,
                 is_company:      formData.is_company ? 1 : 0,
-                company_name:    formData.is_company ? (formData.company_name.trim()             || null) : null,
-                company_rut:     formData.is_company ? (formData.company_rut?.trim()             || null) : null,
-                company_address: formData.is_company ? (formData.company_address?.trim()         || null) : null,
-                company_region:  formData.is_company ? (formData.company_region                  || null) : null,
-                company_city:    formData.is_company ? (formData.company_city                    || null) : null,
-                company_phone:   formData.is_company ? (formData.company_phone?.trim()           || null) : null,
-                company_email:   formData.is_company ? (formData.company_email?.trim()           || null) : null,
-                company_website: formData.is_company ? (formData.company_website?.trim()         || null) : null,
+                company_name:    formData.is_company ? (formData.company_name.trim()     || null) : null,
+                company_rut:     formData.is_company ? (formData.company_rut?.trim()     || null) : null,
+                company_address: formData.is_company ? (formData.company_address?.trim() || null) : null,
+                company_region:  formData.is_company ? (formData.company_region          || null) : null,
+                company_city:    formData.is_company ? (formData.company_city            || null) : null,
+                company_phone:   formData.is_company ? (formData.company_phone?.trim()   || null) : null,
+                company_email:   formData.is_company ? (formData.company_email?.trim()   || null) : null,
+                company_website: formData.is_company ? (formData.company_website?.trim() || null) : null,
                 is_active:       1,
             };
 
             const result = await customerRepo.create(cleanData);
             if (!result?.id) throw new Error('No se obtuvo el ID del cliente creado');
 
-            onCreated({
+            // Guardamos los datos para pasarlos a onCreated cuando el usuario presione Aceptar
+            setSavedCustomer({
                 id:        result.id,
                 full_name: cleanData.full_name,
                 rut:       cleanData.rut   || '',
                 phone:     cleanData.phone || '',
                 email:     cleanData.email || '',
             });
+            setSavedOk(true);
+
         } catch (error) {
             console.error('❌ Error guardando cliente:', error);
             let msg = 'Error al guardar el cliente';
@@ -192,16 +200,33 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                 if (error.message.includes('rut')) {
                     msg = 'Ya existe un cliente con ese RUN';
                     setErrors(prev => ({ ...prev, rut: msg }));
+                    return; // el error ya se muestra inline
                 } else if (error.message.includes('phone')) {
                     msg = 'Ya existe un cliente con ese teléfono';
                     setErrors(prev => ({ ...prev, phone: msg }));
+                    return; // el error ya se muestra inline
                 } else {
                     msg = 'Este cliente ya está registrado';
                 }
+            } else if (
+                error.message?.toLowerCase().includes('teléfono') ||
+                error.message?.toLowerCase().includes('telefono') ||
+                error.message?.toLowerCase().includes('phone')
+            ) {
+                // Error de validación del repositorio sobre el teléfono → inline
+                setErrors(prev => ({ ...prev, phone: error.message }));
+                return;
+            } else if (error.message?.toLowerCase().includes('nombre')) {
+                // Por si el repositorio valida el nombre
+                setErrors(prev => ({ ...prev, full_name: error.message }));
+                return;
+            } else if (error.message?.toLowerCase().includes('email')) {
+                setErrors(prev => ({ ...prev, email: error.message }));
+                return;
             } else {
                 msg = error.message || msg;
             }
-            alert(msg);
+            setSaveError(msg);
         } finally {
             setSaving(false);
         }
@@ -212,6 +237,12 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
         if (saving) return;
         document.body.style.overflow = '';
         onClose();
+    };
+
+    // Al confirmar el éxito, se pasan los datos al padre y se cierra
+    const handleConfirmSuccess = () => {
+        document.body.style.overflow = '';
+        onCreated(savedCustomer);
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -388,7 +419,6 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                             <div className="company-fields">
                                 <h4 className="form-section-subtitle">🏢 Datos de la Empresa</h4>
 
-                                {/* Nombre y RUT */}
                                 <div className="form-row-2">
                                     <Input
                                         label="Nombre Empresa *"
@@ -410,7 +440,6 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                                     />
                                 </div>
 
-                                {/* Contacto empresa */}
                                 <div className="form-row-2">
                                     <Input
                                         label="Teléfono Empresa"
@@ -432,7 +461,6 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                                     />
                                 </div>
 
-                                {/* Sitio web */}
                                 <div className="form-row">
                                     <Input
                                         label="Sitio Web"
@@ -444,7 +472,6 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                                     />
                                 </div>
 
-                                {/* Dirección empresa */}
                                 <div className="form-row">
                                     <Input
                                         label="Dirección Empresa"
@@ -456,7 +483,6 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                                     />
                                 </div>
 
-                                {/* Región / Comuna empresa */}
                                 <div className="form-row-2">
                                     <SearchableSelect
                                         label="Región Empresa"
@@ -499,6 +525,35 @@ const QuickAddCustomerModal = ({ onCreated, onClose, db }) => {
                         Guardar Cliente
                     </Button>
                 </div>
+
+                {/* ── Banner de error inline (reemplaza window.alert) ── */}
+                {saveError && !savedOk && (
+                    <div className="cm-error-banner">
+                        ❌ {saveError}
+                        <button className="cm-banner-close" onClick={() => setSaveError('')}>✕</button>
+                    </div>
+                )}
+
+                {/* ── Overlay de éxito ── */}
+                {savedOk && (
+                    <div className="cm-success-overlay">
+                        <div className="cm-success-card">
+                            <div className="cm-success-icon">✅</div>
+                            <p className="cm-success-msg">Cliente creado exitosamente</p>
+                            <button className="cm-success-btn" onClick={handleConfirmSuccess} autoFocus>
+                                Aceptar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Spinner mientras guarda ── */}
+                {saving && !savedOk && (
+                    <div className="saving-overlay">
+                        <div className="spinner"></div>
+                        <p>Guardando cliente...</p>
+                    </div>
+                )}
             </div>
         </div>
     );
