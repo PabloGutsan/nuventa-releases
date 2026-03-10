@@ -28,8 +28,15 @@ function setupAutoUpdater() {
         return;
     }
 
-    autoUpdater.autoDownload         = true;
+    autoUpdater.autoDownload         = false;
     autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.setFeedURL({
+        provider: 'github',
+        owner:    'PabloGutsan',
+        repo:     'nuventa-releases',
+        private:  false,
+    });
 
     autoUpdater.on('checking-for-update', () => {
         console.log('[Updater] Verificando actualizaciones...');
@@ -76,6 +83,10 @@ function setupAutoUpdater() {
         console.error('[Updater] Error:', error.message);
     });
 }
+
+ipcMain.handle('update:start-download', () => {
+    autoUpdater.downloadUpdate();
+});
 
 ipcMain.handle('update:install-now', () => {
     autoUpdater.quitAndInstall(false, true);

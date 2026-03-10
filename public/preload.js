@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return () => ipcRenderer.removeListener('update:available', handler);
         },
 
+        startDownload: () => ipcRenderer.invoke('update:start-download'),
         getPending: () => ipcRenderer.invoke('update:get-pending'),
 
         onProgress: (callback) => {
