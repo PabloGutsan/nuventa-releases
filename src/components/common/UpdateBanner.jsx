@@ -37,13 +37,15 @@ const UpdateBanner = () => {
     useEffect(() => {
         if (!window.electronAPI?.update || !isAdmin) return;
 
-        // Pedir si hay actualización pendiente que llegó antes de que React montara
-        window.electronAPI.invoke('update:get-pending').then((pending) => {
-            if (pending && !wasDismissedToday()) {
-                setUpdateInfo(pending);
-                setState('available');
-            }
-        }).catch(() => {});
+        // Esperar 2s antes de consultar pending, para que los listeners estén registrados
+        setTimeout(() => {
+            window.electronAPI.invoke('update:get-pending').then((pending) => {
+                if (pending && !wasDismissedToday()) {
+                    setUpdateInfo(pending);
+                    setState('available');
+                }
+            }).catch(() => {});
+        }, 2000);
 
         const offAvailable = window.electronAPI.update.onAvailable((info) => {
             console.log('[UpdateBanner] Actualización disponible:', info);

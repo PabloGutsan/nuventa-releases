@@ -436,13 +436,13 @@ app.whenReady().then(() => {
         setupAutoUpdater();
         createWindow();
 
-        // Verificar actualizaciones 5s después de abrir (no bloquea la carga)
+        // Verificar actualizaciones 15s después de abrir (asegura que React ya está montado)
         if (!isDev) {
             setTimeout(() => {
                 autoUpdater.checkForUpdates().catch(err => {
                     console.log('[Updater] Error en verificación inicial:', err.message);
                 });
-            }, 5000);
+            }, 15000);
         }
     } else {
         app.quit();
