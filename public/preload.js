@@ -45,13 +45,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     license: {
         check: () => ipcRenderer.invoke('license:check'),
         activate: (licenseKey, email, businessName) => ipcRenderer.invoke('license:activate', licenseKey, email, businessName),
-        clear: () => ipcRenderer.invoke('license:clear')
+        clear: () => ipcRenderer.invoke('license:clear'),
+        // Escucha revocación en tiempo real (verificación periódica cada 60min)
+        onRevoked: (callback) => {
+            const handler = (_, data) => callback(data);
+            ipcRenderer.on('license:revoked', handler);
+            return () => ipcRenderer.removeListener('license:revoked', handler);
+        }
     },
 
     // ── Actualizaciones (electron-updater) ────────────────────────────────────
-    // onAvailable   → descarga iniciada automáticamente en segundo plano
-    // onProgress    → progreso de descarga (0-100%)
-    // onDownloaded  → listo para instalar
     update: {
         check: () => ipcRenderer.invoke('update:check'),
 

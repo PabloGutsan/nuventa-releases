@@ -504,3 +504,15 @@
     .cc-body { grid-template-columns: 1fr; }
     .cc-left { border-right: none; border-bottom: 1px solid #e5e7eb; }
 }
+
+/* Badge venta cancelada en tabla de cierre */
+.cc-cancelled-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    background: #fee2e2;
+    color: #dc2626;
+    white-space: nowrap;
+}

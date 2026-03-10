@@ -147,14 +147,13 @@ function App() {
                 const accepted = await window.electronAPI.invoke('terms:accepted');
                 setTermsAccepted(!!accepted);
             } catch {
-                // Entorno sin Electron (dev web) o fallo — no bloquear
                 setTermsAccepted(true);
             }
         };
         checkTerms();
     }, []);
 
-    // ── 2. Verificar licencia ─────────────────────────────────────────────────
+    // ── 2. Verificar licencia al arrancar ─────────────────────────────────────
     useEffect(() => {
         if (!window.electronAPI?.license) {
             setLicenseStatus('licensed');
@@ -178,7 +177,17 @@ function App() {
         verifyLicense();
     }, []);
 
-    // ── 3. Login con detección de must_change_password ───────────────────────
+    // ── 3. Escuchar revocación periódica de licencia (cada 60 min) ───────────
+    useEffect(() => {
+        if (!window.electronAPI?.license?.onRevoked) return;
+        const unsub = window.electronAPI.license.onRevoked((data) => {
+            console.warn('[App] Licencia revocada en tiempo real:', data.reason);
+            setLicenseStatus('unlicensed');
+        });
+        return () => unsub?.();
+    }, []);
+
+    // ── 4. Login con detección de must_change_password ───────────────────────
     const handleLogin = async (username, password) => {
         try {
             const result = await login(username, password);

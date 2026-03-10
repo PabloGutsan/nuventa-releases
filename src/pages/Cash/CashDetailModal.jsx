@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
     FiX, FiPrinter, FiDollarSign, FiCalendar,
     FiTrendingUp, FiTrendingDown, FiCheckCircle,
-    FiClock, FiUser, FiList, FiPackage,
+    FiClock, FiList, FiPackage,
 } from 'react-icons/fi';
 import {
     fmtDate, fmtDuration, PAYMENT_LABELS, buildDetailTicket,
@@ -33,6 +33,7 @@ const CashDetailModal = ({ reg, onClose }) => {
     const [movements,      setMovements]      = useState([]);
     const [salesByPayment, setSalesByPayment] = useState([]);
     const [salesDetail,    setSalesDetail]    = useState([]);
+    const [cashSalesGross, setCashSalesGross] = useState(0);
     const [loading,        setLoading]        = useState(true);
 
     useEffect(() => {
@@ -51,10 +52,10 @@ const CashDetailModal = ({ reg, onClose }) => {
             try {
                 const openedAt = toSQLiteDate(reg.opened_at);
                 const closedAt = reg.closed_at ? toSQLiteDate(reg.closed_at) : getNowSQLite();
-                // CAJA PERSONAL: filtrar siempre por el usuario dueño de la caja
-                const userId = reg.opened_by;
+                const userId   = reg.opened_by;
 
-                const [movs, byPay, detail] = await Promise.all([
+                const [movs, byPay, detail, cashGross] = await Promise.all([
+                    // Movimientos de caja
                     window.electronAPI.database.query(
                         'SELECT cm.*, u.full_name AS user_name ' +
                         'FROM cash_movements cm ' +
@@ -62,6 +63,7 @@ const CashDetailModal = ({ reg, onClose }) => {
                         'WHERE cm.register_id = ? ORDER BY cm.created_at ASC',
                         [reg.id]
                     ),
+                    // Ventas por método de pago — solo no canceladas (para el resumen visible)
                     window.electronAPI.database.query(
                         'SELECT payment_method, COUNT(*) AS count, COALESCE(SUM(total),0) AS total ' +
                         'FROM sales ' +
@@ -71,13 +73,23 @@ const CashDetailModal = ({ reg, onClose }) => {
                         'GROUP BY payment_method ORDER BY total DESC',
                         [openedAt, closedAt, userId]
                     ),
+                    // Detalle de ventas — TODAS (incluso canceladas) para consistencia con arqueo
                     window.electronAPI.database.query(
-                        'SELECT s.sale_number, s.total, s.payment_method, s.created_at, u.full_name AS seller_name ' +
+                        'SELECT s.sale_number, s.total, s.payment_method, s.created_at, ' +
+                        '       s.is_cancelled, u.full_name AS seller_name ' +
                         'FROM sales s LEFT JOIN users u ON s.user_id = u.id ' +
-                        'WHERE s.is_cancelled = 0 ' +
-                        '  AND s.created_at >= ? AND s.created_at <= ? ' +
+                        'WHERE s.created_at >= ? AND s.created_at <= ? ' +
                         '  AND s.user_id = ? ' +
                         'ORDER BY s.created_at ASC',
+                        [openedAt, closedAt, userId]
+                    ),
+                    // Ventas en efectivo incluyendo canceladas — para el arqueo
+                    window.electronAPI.database.get(
+                        'SELECT COALESCE(SUM(total), 0) AS total ' +
+                        'FROM sales ' +
+                        'WHERE payment_method = \'efectivo\' ' +
+                        '  AND created_at >= ? AND created_at <= ? ' +
+                        '  AND user_id = ?',
                         [openedAt, closedAt, userId]
                     ),
                 ]);
@@ -85,6 +97,7 @@ const CashDetailModal = ({ reg, onClose }) => {
                 setMovements(Array.isArray(movs) ? movs : []);
                 setSalesByPayment(Array.isArray(byPay) ? byPay : []);
                 setSalesDetail(Array.isArray(detail) ? detail : []);
+                setCashSalesGross(cashGross?.total || 0);
             } catch (e) {
                 console.error('Error cargando detalle de caja:', e);
             } finally {
@@ -103,14 +116,16 @@ const CashDetailModal = ({ reg, onClose }) => {
         setTimeout(() => { w.print(); w.close(); }, 400);
     };
 
-    const totalIn    = movements.filter(m => m.type === 'in').reduce((a, m) => a + m.amount, 0);
-    const totalOut   = movements.filter(m => m.type === 'out').reduce((a, m) => a + m.amount, 0);
-    const cashSales  = salesByPayment.find(p => p.payment_method === 'efectivo')?.total || 0;
+    const totalIn     = movements.filter(m => m.type === 'in').reduce((a, m) => a + m.amount, 0);
+    const totalOut    = movements.filter(m => m.type === 'out').reduce((a, m) => a + m.amount, 0);
     const totalVentas = salesByPayment.reduce((a, p) => a + p.total, 0);
-    const calculatedExpected = (reg.opening_amount || 0) + totalIn - totalOut + cashSales;
-    const diff       = reg.closing_amount != null ? reg.closing_amount - calculatedExpected : null;
-    const diffClass  = diff == null ? '' : diff === 0 ? 'exact' : diff > 0 ? 'surplus' : 'shortage';
-    const isOpen     = reg.status === 'open';
+    const activeSales = salesDetail.filter(s => !s.is_cancelled).length;
+
+    // Usar cashSalesGross (incluye canceladas) igual que calculateExpectedCash
+    const calculatedExpected = (reg.opening_amount || 0) + totalIn - totalOut + cashSalesGross;
+    const diff      = reg.closing_amount != null ? reg.closing_amount - calculatedExpected : null;
+    const diffClass = diff == null ? '' : diff === 0 ? 'exact' : diff > 0 ? 'surplus' : 'shortage';
+    const isOpen    = reg.status === 'open';
 
     if (!reg) return null;
 
@@ -226,6 +241,7 @@ const CashDetailModal = ({ reg, onClose }) => {
                                 </div>
                             </div>
 
+                            {/* ── Arqueo ── */}
                             <div className="sdm-card sdm-card--full">
                                 <div className="sdm-card-title"><FiDollarSign size={13} /> Arqueo de Caja</div>
                                 <div className="cdm-arqueo-grid">
@@ -248,7 +264,7 @@ const CashDetailModal = ({ reg, onClose }) => {
                                         )}
                                         <div className="sdm-row">
                                             <span className="sdm-label">+ Ventas en efectivo</span>
-                                            <span className="sdm-value sdm-profit-pos">+{fmt(cashSales)}</span>
+                                            <span className="sdm-value sdm-profit-pos">+{fmt(cashSalesGross)}</span>
                                         </div>
                                         <div className="cdm-arqueo-divider" />
                                         <div className="sdm-row cdm-arqueo-total">
@@ -280,10 +296,11 @@ const CashDetailModal = ({ reg, onClose }) => {
                                 )}
                             </div>
 
+                            {/* ── Ventas del turno por método de pago ── */}
                             <div className="sdm-card sdm-card--full">
                                 <div className="sdm-card-title">
                                     <FiDollarSign size={13} /> Ventas del Turno
-                                    <span className="sdm-count-badge">{salesDetail.length}</span>
+                                    <span className="sdm-count-badge">{activeSales}</span>
                                     <span className="cdm-total-ventas">{fmt(totalVentas)}</span>
                                 </div>
                                 {salesByPayment.length === 0 ? (
@@ -303,11 +320,12 @@ const CashDetailModal = ({ reg, onClose }) => {
                                 )}
                             </div>
 
+                            {/* ── Detalle de ventas ── */}
                             {salesDetail.length > 0 && (
                                 <div className="sdm-card sdm-card--full">
                                     <div className="sdm-card-title">
                                         <FiList size={13} /> Detalle de Ventas
-                                        <span className="sdm-count-badge">{salesDetail.length}</span>
+                                        <span className="sdm-count-badge">{activeSales}</span>
                                     </div>
                                     <div className="sdm-table-wrap">
                                         <table className="sdm-table">
@@ -318,11 +336,12 @@ const CashDetailModal = ({ reg, onClose }) => {
                                                     <th>Vendedor</th>
                                                     <th>Forma de pago</th>
                                                     <th style={{ textAlign: 'right' }}>Total</th>
+                                                    <th></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {salesDetail.map((s, i) => (
-                                                    <tr key={i}>
+                                                    <tr key={i} style={s.is_cancelled ? { opacity: 0.55 } : {}}>
                                                         <td><span className="sdm-mono">{s.sale_number}</span></td>
                                                         <td>
                                                             {new Date((s.created_at || '').replace(' ', 'T'))
@@ -334,8 +353,26 @@ const CashDetailModal = ({ reg, onClose }) => {
                                                                 {PAYMENT_LABELS[s.payment_method] || s.payment_method}
                                                             </span>
                                                         </td>
-                                                        <td style={{ textAlign: 'right' }}>
+                                                        <td style={{
+                                                            textAlign: 'right',
+                                                            textDecoration: s.is_cancelled ? 'line-through' : 'none',
+                                                            color: s.is_cancelled ? '#9ca3af' : 'inherit',
+                                                        }}>
                                                             <strong>{fmt(s.total)}</strong>
+                                                        </td>
+                                                        <td>
+                                                            {s.is_cancelled ? (
+                                                                <span style={{
+                                                                    display: 'inline-block',
+                                                                    padding: '2px 7px',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '10px',
+                                                                    fontWeight: 600,
+                                                                    background: '#fee2e2',
+                                                                    color: '#dc2626',
+                                                                    whiteSpace: 'nowrap',
+                                                                }}>Cancelada</span>
+                                                            ) : null}
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -345,6 +382,7 @@ const CashDetailModal = ({ reg, onClose }) => {
                                 </div>
                             )}
 
+                            {/* ── Movimientos de efectivo ── */}
                             {movements.length > 0 && (
                                 <div className="sdm-card sdm-card--full">
                                     <div className="sdm-card-title">

@@ -5,10 +5,6 @@ class SaleRepository {
         this.db = db;
     }
 
-    // ============================================================================
-    // HELPER: Obtener timestamp local
-    // ============================================================================
-
     getLocalTimestamp() {
         const now = new Date();
         const year = now.getFullYear();
@@ -28,13 +24,8 @@ class SaleRepository {
         return `${year}-${month}-${day}`;
     }
 
-    // ============================================================================
-    // CORE: Generar número de venta único
-    // ============================================================================
-
     async generateSaleNumber() {
         try {
-            console.log('🔢 Generando número de venta...');
             const now = new Date();
             const timestamp = now.getTime();
             const saleNumber = `V-${timestamp}`;
@@ -45,17 +36,12 @@ class SaleRepository {
             if (existing && existing.length > 0) {
                 return `V-${timestamp}-${Math.random().toString(36).substr(2, 5)}`;
             }
-            console.log('✅ Número de venta generado:', saleNumber);
             return saleNumber;
         } catch (error) {
             console.error('❌ Error generating sale number:', error);
             return `V-${Date.now()}`;
         }
     }
-
-    // ============================================================================
-    // CORE: Crear venta completa con transacción
-    // ============================================================================
 
     async createSale(saleData, items) {
         try {
@@ -71,9 +57,6 @@ class SaleRepository {
                 if (item.unit_price === undefined || item.unit_price < 0) throw new Error('El precio unitario no puede ser negativo');
             }
 
-            console.log('💰 Creando venta:', saleData.sale_number);
-            console.log('📦 Items:', items.length);
-
             for (const item of items) {
                 if (item.product_type !== 'service') {
                     const productResult = await window.electronAPI.database.query(
@@ -83,7 +66,6 @@ class SaleRepository {
                     if (!productResult || productResult.length === 0) throw new Error(`Producto con ID ${item.product_id} no encontrado`);
                     const product = productResult[0];
                     const itemQuantity = parseFloat(item.quantity);
-                    // ✅ FIX: respetar unlimited_stock antes de validar stock físico
                     const isUnlimited = product.unlimited_stock === 1 || product.unlimited_stock === true;
                     const allowNegative = product.allow_negative_stock === 1 || product.allow_negative_stock === true;
                     if (!isUnlimited && !allowNegative && product.stock < itemQuantity) {
@@ -93,7 +75,6 @@ class SaleRepository {
             }
 
             const localTimestamp = this.getLocalTimestamp();
-            console.log('🕐 Timestamp local:', localTimestamp);
 
             const saleResult = await window.electronAPI.database.run(`
                 INSERT INTO sales (
@@ -125,42 +106,31 @@ class SaleRepository {
                 localTimestamp
             ]);
 
-            console.log('📊 Sale result:', saleResult);
-
             let saleId;
             if (saleResult && typeof saleResult === 'object') {
                 saleId = saleResult.lastID || saleResult.lastInsertRowid || saleResult.id || saleResult.insertId;
                 if (!saleId && saleResult.changes) {
-                    console.log('🔍 Buscando ID por sale_number...');
                     const findResult = await window.electronAPI.database.query(
                         'SELECT id FROM sales WHERE sale_number = ? ORDER BY id DESC LIMIT 1',
                         [saleData.sale_number]
                     );
-                    if (findResult && findResult.length > 0) {
-                        saleId = findResult[0].id;
-                        console.log('✅ ID encontrado:', saleId);
-                    }
+                    if (findResult && findResult.length > 0) saleId = findResult[0].id;
                 }
             }
 
-            console.log('🆔 Sale ID obtenido:', saleId);
-
             if (!saleId || saleId === 0) {
-                console.warn('⚠️ No se obtuvo lastID, buscando...');
                 const findResult = await window.electronAPI.database.query(
                     'SELECT id FROM sales WHERE sale_number = ? ORDER BY id DESC LIMIT 1',
                     [saleData.sale_number]
                 );
                 if (findResult && findResult.length > 0) {
                     saleId = findResult[0].id;
-                    console.log('✅ ID recuperado:', saleId);
                 } else {
                     throw new Error('No se pudo obtener el ID de la venta creada');
                 }
             }
 
             for (const item of items) {
-                console.log('📦 Agregando item:', item.product_name);
                 const itemQuantity = parseFloat(item.quantity);
                 const itemUnitPrice = parseFloat(item.unit_price);
                 const itemCostPrice = parseFloat(item.cost_price) || 0;
@@ -168,8 +138,6 @@ class SaleRepository {
                 const itemDiscount = parseFloat(item.discount) || 0;
                 const itemTax = parseFloat(item.tax) || 0;
                 const itemTotal = parseFloat(item.total);
-
-                console.log(`  📊 Cantidad: ${itemQuantity} ${item.unit_label || ''}`);
 
                 await window.electronAPI.database.run(`
                     INSERT INTO sale_items (
@@ -188,7 +156,6 @@ class SaleRepository {
                 ]);
 
                 if (item.product_type !== 'service') {
-                    // ✅ FIX: verificar unlimited_stock antes de descontar stock
                     const prodCheck = await window.electronAPI.database.query(
                         'SELECT stock, unlimited_stock FROM products WHERE id = ?', [item.product_id]
                     );
@@ -196,9 +163,7 @@ class SaleRepository {
                     const prodUnlimited = prodData.unlimited_stock === 1 || prodData.unlimited_stock === true;
 
                     if (!prodUnlimited) {
-                        console.log(`📉 Actualizando stock del producto ${item.product_id}: -${itemQuantity}`);
                         const previousStock = parseFloat(prodData.stock) || 0;
-
                         await window.electronAPI.database.run(`
                             UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?
                         `, [itemQuantity, localTimestamp, item.product_id]);
@@ -214,8 +179,6 @@ class SaleRepository {
                             previousStock, previousStock - itemQuantity,
                             `Venta ${saleData.sale_number}`, 'sale', saleId, localTimestamp
                         ]);
-                    } else {
-                        console.log(`♾️ Producto ${item.product_id} es unlimited_stock — sin descuento de stock`);
                     }
                 }
             }
@@ -233,58 +196,43 @@ class SaleRepository {
         }
     }
 
-    // ============================================================================
-    // QUERIES: Obtener ventas
-    // ============================================================================
-
     async getSaleById(id) {
-    try {
-        const sales = await window.electronAPI.database.query(`
-            SELECT
-                s.*,
-                u.full_name  AS seller_name,
-                cu.full_name AS canceller_name
-            FROM sales s
-            LEFT JOIN users u  ON s.user_id      = u.id
-            LEFT JOIN users cu ON s.cancelled_by = cu.id
-            WHERE s.id = ?
-        `, [id]);
+        try {
+            const sales = await window.electronAPI.database.query(`
+                SELECT s.*, u.full_name AS seller_name, cu.full_name AS canceller_name
+                FROM sales s
+                LEFT JOIN users u  ON s.user_id      = u.id
+                LEFT JOIN users cu ON s.cancelled_by = cu.id
+                WHERE s.id = ?
+            `, [id]);
 
-        if (!Array.isArray(sales) || sales.length === 0) return null;
+            if (!Array.isArray(sales) || sales.length === 0) return null;
 
-        const items = await window.electronAPI.database.query(`
-            SELECT * FROM sale_items
-            WHERE sale_id = ?
-            ORDER BY id ASC
-        `, [id]);
+            const items = await window.electronAPI.database.query(`
+                SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id ASC
+            `, [id]);
 
-        return {
-            ...sales[0],
-            items: Array.isArray(items) ? items : [],
-        };
-    } catch (error) {
-        console.error('❌ Error getting sale by ID:', error);
-        return null;
+            return { ...sales[0], items: Array.isArray(items) ? items : [] };
+        } catch (error) {
+            console.error('❌ Error getting sale by ID:', error);
+            return null;
+        }
     }
-}
 
     async getSaleByNumber(saleNumber) {
         try {
-            if (!saleNumber || !saleNumber.trim()) { console.warn('⚠️ Número de venta inválido'); return null; }
-            console.log('🔍 Buscando venta:', saleNumber);
+            if (!saleNumber || !saleNumber.trim()) return null;
             const sales = await window.electronAPI.database.query(`
                 SELECT s.*, u.full_name as seller_name
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.id
                 WHERE s.sale_number = ?
             `, [saleNumber.trim()]);
-            if (!Array.isArray(sales) || sales.length === 0) { console.log('⚠️ Venta no encontrada'); return null; }
-            const items = await window.electronAPI.database.query(`
-                SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id
-            `, [sales[0].id]);
-            const sale = { ...sales[0], items: Array.isArray(items) ? items : [] };
-            console.log('✅ Venta encontrada:', sale.sale_number);
-            return sale;
+            if (!Array.isArray(sales) || sales.length === 0) return null;
+            const items = await window.electronAPI.database.query(
+                'SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id', [sales[0].id]
+            );
+            return { ...sales[0], items: Array.isArray(items) ? items : [] };
         } catch (error) {
             console.error('❌ Error getting sale by number:', error);
             return null;
@@ -293,11 +241,8 @@ class SaleRepository {
 
     async getAll() {
         try {
-            console.log('💰 Obteniendo todas las ventas...');
             const sales = await window.electronAPI.database.query(`
-                SELECT 
-                    s.*,
-                    u.full_name as seller_name,
+                SELECT s.*, u.full_name as seller_name,
                     (SELECT COUNT(*) FROM sale_items WHERE sale_id = s.id) as items_count,
                     (SELECT SUM(quantity) FROM sale_items WHERE sale_id = s.id) as total_items
                 FROM sales s
@@ -305,9 +250,7 @@ class SaleRepository {
                 WHERE s.is_cancelled = 0
                 ORDER BY s.created_at DESC
             `);
-            if (!Array.isArray(sales)) { console.warn('⚠️ Sales query no retornó array'); return []; }
-            console.log(`✅ ${sales.length} ventas obtenidas`);
-            return sales;
+            return Array.isArray(sales) ? sales : [];
         } catch (error) {
             console.error('❌ Error getting all sales:', error);
             return [];
@@ -316,24 +259,17 @@ class SaleRepository {
 
     async getTodaySales() {
         try {
-            console.log('📅 Obteniendo ventas de hoy...');
             const todayDate = this.getLocalDate();
-            console.log('📅 Fecha de hoy:', todayDate);
             const sales = await window.electronAPI.database.query(`
-                SELECT 
-                    s.*,
-                    u.full_name as seller_name,
+                SELECT s.*, u.full_name as seller_name,
                     (SELECT COUNT(*) FROM sale_items WHERE sale_id = s.id) as items_count,
                     (SELECT SUM(quantity) FROM sale_items WHERE sale_id = s.id) as total_items
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.id
-                WHERE DATE(s.created_at) = ?
-                AND s.is_cancelled = 0
+                WHERE DATE(s.created_at) = ? AND s.is_cancelled = 0
                 ORDER BY s.created_at DESC
             `, [todayDate]);
-            if (!Array.isArray(sales)) { console.warn('⚠️ Today sales query no retornó array'); return []; }
-            console.log(`✅ ${sales.length} ventas de hoy obtenidas`);
-            return sales;
+            return Array.isArray(sales) ? sales : [];
         } catch (error) {
             console.error('❌ Error getting today sales:', error);
             return [];
@@ -357,21 +293,17 @@ class SaleRepository {
 
             const localTimestamp = this.getLocalTimestamp();
 
-            // ✅ FIX: traer unlimited_stock para no restaurar stock en productos ilimitados
+            // ── Devolver stock ─────────────────────────────────────────────────
             const items = await window.electronAPI.database.query(`
-            SELECT si.*, p.allow_negative_stock, p.unlimited_stock
-            FROM sale_items si
-            LEFT JOIN products p ON si.product_id = p.id
-            WHERE si.sale_id = ?
-        `, [id]);
+                SELECT si.*, p.allow_negative_stock, p.unlimited_stock
+                FROM sale_items si
+                LEFT JOIN products p ON si.product_id = p.id
+                WHERE si.sale_id = ?
+            `, [id]);
 
             for (const item of items) {
-                // ✅ FIX: saltar productos con stock ilimitado — igual que en createSale
                 const isUnlimited = item.unlimited_stock === 1 || item.unlimited_stock === true;
-                if (isUnlimited) {
-                    console.log(`♾️ Producto ${item.product_id} es unlimited_stock — sin devolución de stock`);
-                    continue;
-                }
+                if (isUnlimited) continue;
 
                 const productExists = await window.electronAPI.database.query(
                     'SELECT id, stock FROM products WHERE id = ?', [item.product_id]
@@ -381,19 +313,18 @@ class SaleRepository {
                     const itemQuantity = parseFloat(item.quantity);
                     const previousStock = parseFloat(productExists[0].stock);
 
-                    console.log(`📈 Devolviendo stock producto ${item.product_id}: +${itemQuantity}`);
+                    await window.electronAPI.database.run(
+                        'UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?',
+                        [itemQuantity, localTimestamp, item.product_id]
+                    );
 
                     await window.electronAPI.database.run(`
-                    UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?
-                `, [itemQuantity, localTimestamp, item.product_id]);
-
-                    await window.electronAPI.database.run(`
-                    INSERT INTO inventory_movements (
-                        product_id, movement_type, quantity,
-                        previous_stock, new_stock, reason,
-                        reference_type, reference_id, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `, [
+                        INSERT INTO inventory_movements (
+                            product_id, movement_type, quantity,
+                            previous_stock, new_stock, reason,
+                            reference_type, reference_id, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `, [
                         item.product_id, 'devolucion', itemQuantity,
                         previousStock, previousStock + itemQuantity,
                         `Cancelación de venta ${sale.sale_number}`,
@@ -402,12 +333,53 @@ class SaleRepository {
                 }
             }
 
+            // ── Marcar venta como cancelada ────────────────────────────────────
             await window.electronAPI.database.run(`
-            UPDATE sales
-            SET is_cancelled = 1, cancelled_at = ?, cancelled_by = ?,
-                cancellation_reason = ?, updated_at = ?
-            WHERE id = ?
-        `, [localTimestamp, userId, reason.trim(), localTimestamp, id]);
+                UPDATE sales
+                SET is_cancelled = 1, cancelled_at = ?, cancelled_by = ?,
+                    cancellation_reason = ?, updated_at = ?
+                WHERE id = ?
+            `, [localTimestamp, userId, reason.trim(), localTimestamp, id]);
+
+            // ── FIX: Registrar egreso en caja si el pago fue en efectivo ───────
+            // Al cancelar, la venta sale del cálculo de cashSales (is_cancelled=0).
+            // Sin este egreso, el expectedCash quedaría menor que el efectivo físico
+            // porque el dinero ya entró a caja pero no hay registro de que salió.
+            const needsCashMovement =
+                sale.payment_method === 'efectivo' ||
+                sale.payment_method === 'multiple';
+
+            if (needsCashMovement) {
+                // Buscar caja abierta del usuario que vendió (sale.user_id)
+                const openRegister = await window.electronAPI.database.get(`
+                    SELECT id FROM cash_registers
+                    WHERE status = 'open' AND opened_by = ?
+                    ORDER BY opened_at DESC LIMIT 1
+                `, [sale.user_id]);
+
+                if (openRegister) {
+                    // Para pagos múltiples usar cash_received si está disponible,
+                    // de lo contrario usar el total completo de la venta
+                    const cashAmount = sale.payment_method === 'multiple'
+                        ? (sale.cash_received || sale.total)
+                        : sale.total;
+
+                    await window.electronAPI.database.run(`
+                        INSERT INTO cash_movements (register_id, user_id, type, amount, reason, created_at)
+                        VALUES (?, ?, 'out', ?, ?, ?)
+                    `, [
+                        openRegister.id,
+                        userId,
+                        Math.round(cashAmount),
+                        `Devolución - ${sale.sale_number}`,
+                        localTimestamp
+                    ]);
+
+                    console.log(`💵 Egreso de caja registrado por cancelación: $${Math.round(cashAmount)}`);
+                } else {
+                    console.warn('⚠️ No hay caja abierta para registrar egreso por cancelación');
+                }
+            }
 
             console.log('✅ Venta cancelada exitosamente');
             return { success: true };
@@ -418,16 +390,14 @@ class SaleRepository {
     }
 
     // ============================================================================
-    // STATS: Estadísticas
+    // STATS
     // ============================================================================
 
     async getTodayStats() {
         try {
-            console.log('📊 Obteniendo estadísticas de hoy...');
             const todayDate = this.getLocalDate();
             const stats = await window.electronAPI.database.query(`
-                SELECT 
-                    COUNT(*) as total_sales,
+                SELECT COUNT(*) as total_sales,
                     COALESCE(SUM(total), 0) as total_revenue,
                     COALESCE(AVG(total), 0) as average_ticket,
                     COALESCE(SUM(subtotal), 0) as total_subtotal,
@@ -439,7 +409,7 @@ class SaleRepository {
             if (!Array.isArray(stats) || stats.length === 0) {
                 return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
             }
-            const result = {
+            return {
                 total_sales: parseInt(stats[0].total_sales) || 0,
                 total_revenue: parseFloat(stats[0].total_revenue) || 0,
                 average_ticket: parseFloat(stats[0].average_ticket) || 0,
@@ -447,8 +417,6 @@ class SaleRepository {
                 total_discount: parseFloat(stats[0].total_discount) || 0,
                 total_tax: parseFloat(stats[0].total_tax) || 0
             };
-            console.log('✅ Estadísticas de hoy:', result);
-            return result;
         } catch (error) {
             console.error('❌ Error getting today stats:', error);
             return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
@@ -457,14 +425,9 @@ class SaleRepository {
 
     async getPeriodStats(dateFrom, dateTo) {
         try {
-            if (!dateFrom || !dateTo) {
-                console.warn('⚠️ Fechas inválidas');
-                return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0 };
-            }
-            console.log('📊 Estadísticas:', dateFrom, 'a', dateTo);
+            if (!dateFrom || !dateTo) return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0 };
             const results = await window.electronAPI.database.query(`
-                SELECT 
-                    COUNT(*) as total_sales,
+                SELECT COUNT(*) as total_sales,
                     COALESCE(SUM(total), 0) as total_revenue,
                     COALESCE(AVG(total), 0) as average_ticket,
                     COALESCE(SUM(CASE WHEN is_cancelled = 1 THEN 1 ELSE 0 END), 0) as cancelled_sales,
@@ -478,7 +441,7 @@ class SaleRepository {
             if (!Array.isArray(results) || results.length === 0) {
                 return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
             }
-            const stats = {
+            return {
                 total_sales: parseInt(results[0].total_sales) || 0,
                 total_revenue: parseFloat(results[0].total_revenue) || 0,
                 average_ticket: parseFloat(results[0].average_ticket) || 0,
@@ -488,48 +451,33 @@ class SaleRepository {
                 total_discount: parseFloat(results[0].total_discount) || 0,
                 total_tax: parseFloat(results[0].total_tax) || 0
             };
-            console.log('✅ Estadísticas del período:', stats);
-            return stats;
         } catch (error) {
             console.error('❌ Error getting period stats:', error);
             return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0 };
         }
     }
 
-    // ✅ NUEVO: Stats de un usuario para un día específico (rol vendedor)
     async getUserDayStats(userId, date) {
         try {
-            if (!userId || !date) {
-                console.warn('⚠️ userId o date inválido');
-                return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0 };
-            }
-
-            console.log('📊 Stats de usuario:', userId, 'fecha:', date);
-
+            if (!userId || !date) return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0 };
             const result = await window.electronAPI.database.query(`
                 SELECT
-                    COUNT(CASE WHEN is_cancelled = 0 THEN 1 END)          as total_sales,
+                    COUNT(CASE WHEN is_cancelled = 0 THEN 1 END) as total_sales,
                     COALESCE(SUM(CASE WHEN is_cancelled = 0 THEN total ELSE 0 END), 0) as total_revenue,
-                    COALESCE(AVG(CASE WHEN is_cancelled = 0 THEN total END), 0)        as average_ticket,
-                    COUNT(CASE WHEN is_cancelled = 1 THEN 1 END)          as cancelled_sales
+                    COALESCE(AVG(CASE WHEN is_cancelled = 0 THEN total END), 0) as average_ticket,
+                    COUNT(CASE WHEN is_cancelled = 1 THEN 1 END) as cancelled_sales
                 FROM sales
-                WHERE user_id = ?
-                AND DATE(created_at) = DATE(?)
+                WHERE user_id = ? AND DATE(created_at) = DATE(?)
             `, [userId, date]);
-
             if (!Array.isArray(result) || result.length === 0) {
                 return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0 };
             }
-
-            const stats = {
+            return {
                 total_sales: parseInt(result[0].total_sales) || 0,
                 total_revenue: parseFloat(result[0].total_revenue) || 0,
                 average_ticket: parseFloat(result[0].average_ticket) || 0,
                 cancelled_sales: parseInt(result[0].cancelled_sales) || 0,
             };
-
-            console.log('✅ Stats de usuario:', stats);
-            return stats;
         } catch (error) {
             console.error('❌ Error getting user day stats:', error);
             return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0 };
@@ -538,64 +486,33 @@ class SaleRepository {
 
     async getSalesFiltered(filters = {}) {
         try {
-            console.log('🔍 Ventas filtradas:', filters);
-
             let sql = `
-                SELECT 
-                    s.*,
-                    u.full_name as seller_name,
+                SELECT s.*, u.full_name as seller_name,
                     (SELECT COUNT(*) FROM sale_items WHERE sale_id = s.id) as items_count,
                     (SELECT SUM(quantity) FROM sale_items WHERE sale_id = s.id) as total_items
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.id
                 WHERE 1=1
             `;
-
             const params = [];
 
             if (filters.search && filters.search.trim()) {
-                sql += ` AND (
-                    s.sale_number LIKE ? 
-                    OR s.customer_name LIKE ? 
-                    OR s.document_number LIKE ?
-                    OR s.customer_rut LIKE ?
-                )`;
+                sql += ` AND (s.sale_number LIKE ? OR s.customer_name LIKE ? OR s.document_number LIKE ? OR s.customer_rut LIKE ?)`;
                 const searchTerm = `%${filters.search.trim()}%`;
                 params.push(searchTerm, searchTerm, searchTerm, searchTerm);
             }
-
-            if (filters.dateFrom) {
-                sql += ` AND DATE(s.created_at) >= DATE(?)`;
-                params.push(filters.dateFrom);
-            }
-
-            if (filters.dateTo) {
-                sql += ` AND DATE(s.created_at) <= DATE(?)`;
-                params.push(filters.dateTo);
-            }
-
-            // ✅ Filtro por user_id (rol vendedor — solo sus ventas)
-            if (filters.userId) {
-                sql += ` AND s.user_id = ?`;
-                params.push(filters.userId);
-            }
-
+            if (filters.dateFrom) { sql += ` AND DATE(s.created_at) >= DATE(?)`; params.push(filters.dateFrom); }
+            if (filters.dateTo)   { sql += ` AND DATE(s.created_at) <= DATE(?)`; params.push(filters.dateTo); }
+            if (filters.userId)   { sql += ` AND s.user_id = ?`; params.push(filters.userId); }
             if (filters.paymentMethod && filters.paymentMethod.trim()) {
-                sql += ` AND s.payment_method = ?`;
-                params.push(filters.paymentMethod.trim());
+                sql += ` AND s.payment_method = ?`; params.push(filters.paymentMethod.trim());
             }
-
-            // ✅ NUEVO: Filtro por nombre de vendedor (admin — selector de vendedor)
             if (filters.sellerName && filters.sellerName.trim()) {
-                sql += ` AND u.full_name = ?`;
-                params.push(filters.sellerName.trim());
+                sql += ` AND u.full_name = ?`; params.push(filters.sellerName.trim());
             }
-
             if (filters.documentType && filters.documentType.trim()) {
-                sql += ` AND s.document_type = ?`;
-                params.push(filters.documentType.trim());
+                sql += ` AND s.document_type = ?`; params.push(filters.documentType.trim());
             }
-
             if (filters.showCancelled === false || filters.showCancelled === 0) {
                 sql += ` AND s.is_cancelled = 0`;
             } else if (filters.showCancelled === true || filters.showCancelled === 1) {
@@ -603,18 +520,12 @@ class SaleRepository {
             }
 
             sql += ` ORDER BY s.created_at DESC`;
-
             if (filters.limit && parseInt(filters.limit) > 0) {
-                sql += ` LIMIT ?`;
-                params.push(parseInt(filters.limit));
+                sql += ` LIMIT ?`; params.push(parseInt(filters.limit));
             }
 
             const sales = await window.electronAPI.database.query(sql, params);
-
-            if (!Array.isArray(sales)) return [];
-
-            console.log(`✅ ${sales.length} ventas filtradas`);
-            return sales;
+            return Array.isArray(sales) ? sales : [];
         } catch (error) {
             console.error('❌ Error getting filtered sales:', error);
             return [];
@@ -625,10 +536,7 @@ class SaleRepository {
         try {
             if (!dateFrom || !dateTo) return [];
             const paymentMethods = await window.electronAPI.database.query(`
-                SELECT 
-                    payment_method,
-                    COUNT(*) as count,
-                    COALESCE(SUM(total), 0) as total
+                SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total), 0) as total
                 FROM sales
                 WHERE DATE(created_at) >= DATE(?) AND DATE(created_at) <= DATE(?)
                 AND is_cancelled = 0
@@ -646,9 +554,7 @@ class SaleRepository {
         try {
             if (!dateFrom || !dateTo) return [];
             const products = await window.electronAPI.database.query(`
-                SELECT 
-                    si.product_name,
-                    si.product_sku,
+                SELECT si.product_name, si.product_sku,
                     SUM(si.quantity) as total_quantity,
                     COUNT(DISTINCT si.sale_id) as times_sold,
                     COALESCE(SUM(si.total), 0) as total_revenue,
@@ -672,9 +578,7 @@ class SaleRepository {
         try {
             if (!dateFrom || !dateTo) return [];
             const sellers = await window.electronAPI.database.query(`
-                SELECT 
-                    s.user_id,
-                    u.full_name as seller_name,
+                SELECT s.user_id, u.full_name as seller_name,
                     COUNT(*) as total_sales,
                     COALESCE(SUM(s.total), 0) as total_revenue,
                     COALESCE(AVG(s.total), 0) as average_ticket
@@ -695,8 +599,7 @@ class SaleRepository {
     async getMonthlyComparison(months = 12) {
         try {
             const comparison = await window.electronAPI.database.query(`
-                SELECT 
-                    strftime('%Y-%m', created_at) as month,
+                SELECT strftime('%Y-%m', created_at) as month,
                     COUNT(*) as count,
                     COALESCE(SUM(total), 0) as total,
                     COALESCE(AVG(total), 0) as average

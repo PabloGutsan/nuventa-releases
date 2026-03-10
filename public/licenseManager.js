@@ -55,10 +55,11 @@ async function generateFingerprint() {
 // Reglas:
 //   1. Sin licencia local → pedir activación
 //   2. Sin internet       → usar licencia local (funciona siempre offline)
-//   3. Servidor responde OK válido    → dejar entrar, actualizar datos locales
+//   3. Servidor responde OK válido      → dejar entrar, actualizar datos locales
 //   4. Servidor responde INVALID_DEVICE → bloquear (licencia en otro equipo)
-//   5. Servidor responde error 4xx/5xx  → usar licencia local (servidor con problemas)
-//   6. Servidor no existe / timeout / DNS fail → usar licencia local
+//   5. Servidor responde INACTIVE       → bloquear (licencia cancelada por admin)
+//   6. Servidor responde error 4xx/5xx  → usar licencia local (servidor con problemas)
+//   7. Servidor no existe / timeout / DNS fail → usar licencia local
 //      (cubre el caso de empresa cerrada o API eliminada)
 // ============================================================================
 async function checkLicense() {
@@ -105,10 +106,7 @@ async function checkLicense() {
             };
         }
 
-        // El servidor respondió pero dice que es inválida
-        // Solo bloqueamos en caso INVALID_DEVICE (licencia copiada a otro equipo)
-        // Para cualquier otro motivo (INACTIVE, NOT_FOUND) dejamos pasar — puede
-        // ser un error de datos en el servidor, no abuso del usuario
+        // ── Licencia en otro equipo ───────────────────────────────────────────
         if (data.reason === 'INVALID_DEVICE') {
             console.warn('[License] INVALID_DEVICE — licencia en otro equipo. Bloqueando.');
             store.delete('license');
@@ -120,28 +118,36 @@ async function checkLicense() {
             };
         }
 
+        // ── Licencia cancelada por administrador ──────────────────────────────
+        if (data.reason === 'INACTIVE') {
+            console.warn('[License] INACTIVE — licencia cancelada. Bloqueando.');
+            store.delete('license');
+            return {
+                hasLicense: false,
+                blocked: true,
+                reason: 'INACTIVE',
+                message: 'Tu licencia ha sido cancelada.\nContacta a soporte en nuventa.cl para más información.'
+            };
+        }
+
         // Cualquier otro reason → dejar pasar con licencia local
         console.warn('[License] Servidor devolvió valid:false con reason:', data.reason, '— usando licencia local.');
         return _localLicense(license);
 
     } catch (error) {
         // ── Sin internet, timeout, DNS fail, servidor caído o inexistente ──
-        // En todos estos casos el usuario conserva su licencia local.
-        // Esto cubre intencionalmente el caso en que la empresa cierre
-        // o el servidor ya no exista — el cliente no pierde su software.
         const isNetworkError = (
             error.code === 'ECONNREFUSED' ||
-            error.code === 'ENOTFOUND' ||     // DNS no existe → API eliminada
+            error.code === 'ENOTFOUND' ||
             error.code === 'ETIMEDOUT' ||
             error.code === 'ECONNABORTED' ||
             error.code === 'ERR_NETWORK' ||
-            !error.response                    // cualquier error sin respuesta HTTP
+            !error.response
         );
 
         if (isNetworkError) {
             console.log('[License] Servidor no disponible (', error.code, ') — usando licencia local.');
         } else {
-            // Error HTTP 5xx del servidor → igual dejamos pasar
             console.warn('[License] Error del servidor (', error.response?.status, ') — usando licencia local.');
         }
 
@@ -163,7 +169,7 @@ function _localLicense(license) {
     };
 }
 
-// Alias para compatibilidad
+// Solo lectura local — sin verificación de servidor
 function checkLocalLicense() {
     const license = store.get('license');
     if (!license || !license.isActive) return { hasLicense: false };

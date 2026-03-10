@@ -1,6 +1,5 @@
 // src/services/repositories/cashRegisterRepository.js
 
-// ── Helper: convierte cualquier formato de fecha a 'YYYY-MM-DD HH:MM:SS'
 const toSQLiteDate = (isoOrDate) => {
     if (!isoOrDate) return null;
     const d = new Date(isoOrDate);
@@ -14,7 +13,6 @@ const nowSQLite = () => toSQLiteDate(new Date());
 
 class CashRegisterRepository {
 
-    // ── Obtener cualquier caja abierta (genérico, compatibilidad) ─────────────
     async getOpenRegister() {
         try {
             const row = await window.electronAPI.database.get(`
@@ -29,10 +27,6 @@ class CashRegisterRepository {
         } catch { return null; }
     }
 
-    // ── Obtener caja abierta del usuario específico (caja personal) ───────────
-    // A diferencia de getOpenRegister(), este método garantiza que cada
-    // usuario solo accede a su propia caja. Un admin que inicia sesión
-    // no verá la caja de un vendedor y viceversa.
     async getOpenRegisterByUser(userId) {
         try {
             const row = await window.electronAPI.database.get(`
@@ -54,7 +48,6 @@ class CashRegisterRepository {
         }
     }
 
-    // ── Abrir caja ────────────────────────────────────────────────────────────
     async openRegister({ userId, openingAmount }) {
         const now = nowSQLite();
         const result = await window.electronAPI.database.run(`
@@ -65,6 +58,11 @@ class CashRegisterRepository {
     }
 
     // ── Calcular efectivo esperado al cierre ──────────────────────────────────
+    // Las ventas en efectivo se incluyen TODAS (incluso canceladas) porque el
+    // dinero físicamente entró a la caja. Las cancelaciones generan un movimiento
+    // 'out' separado (razón: "Devolución - V-XXXX") que refleja la salida del
+    // dinero devuelto al cliente. Así el arqueo muestra el flujo completo:
+    //   entrada por venta + salida por devolución = neto correcto.
     async calculateExpectedCash(registerId) {
         try {
             const reg = await window.electronAPI.database.get(
@@ -82,13 +80,14 @@ class CashRegisterRepository {
                 WHERE register_id = ?
             `, [registerId]);
 
-            // Ventas en efectivo del turno — solo las del usuario que abrió la caja
-            // CAJA PERSONAL: no mezclar ventas de otros usuarios
+            // ── Ventas en efectivo del turno — incluye canceladas ──────────────
+            // Se incluyen las canceladas porque el efectivo SÍ entró a la caja
+            // al momento de la venta. La devolución queda registrada como
+            // movimiento 'out' en cash_movements, no aquí.
             const cashSales = await window.electronAPI.database.get(`
                 SELECT COALESCE(SUM(total), 0) AS total
                 FROM sales
                 WHERE payment_method = 'efectivo'
-                  AND is_cancelled = 0
                   AND created_at >= ?
                   AND user_id = ?
             `, [openedAt, reg.opened_by]);
@@ -106,7 +105,6 @@ class CashRegisterRepository {
         }
     }
 
-    // ── Cerrar caja ───────────────────────────────────────────────────────────
     async closeRegister({ registerId, userId, closingAmount, expectedCash, notes }) {
         const now  = nowSQLite();
         const diff = closingAmount - expectedCash;
@@ -124,7 +122,6 @@ class CashRegisterRepository {
         return diff;
     }
 
-    // ── Agregar movimiento ────────────────────────────────────────────────────
     async addMovement({ registerId, userId, type, amount, reason }) {
         await window.electronAPI.database.run(`
             INSERT INTO cash_movements (register_id, user_id, type, amount, reason)
@@ -132,7 +129,6 @@ class CashRegisterRepository {
         `, [registerId, userId, type, amount, reason]);
     }
 
-    // ── Obtener movimientos de una sesión ─────────────────────────────────────
     async getMovements(registerId) {
         try {
             const rows = await window.electronAPI.database.query(`
@@ -146,7 +142,6 @@ class CashRegisterRepository {
         } catch { return []; }
     }
 
-    // ── Obtener ventas del turno agrupadas por método de pago ─────────────────
     async getSalesSummary(registerId) {
         try {
             const reg = await window.electronAPI.database.get(
@@ -156,7 +151,7 @@ class CashRegisterRepository {
 
             const openedAt = toSQLiteDate(reg.opened_at);
 
-            // CAJA PERSONAL: solo ventas del usuario que abrió la caja
+            // Solo ventas no canceladas para el resumen visible de ventas del turno
             const byPayment = await window.electronAPI.database.query(`
                 SELECT payment_method,
                        COUNT(*)                AS count,
@@ -177,18 +172,29 @@ class CashRegisterRepository {
                   AND user_id = ?
             `, [openedAt, reg.opened_by]);
 
+            // cashSalesGross: efectivo recibido incluyendo ventas canceladas.
+            // Usado SOLO en el arqueo visual para que la suma cuadre con
+            // expectedCash. Las cancelaciones aparecen como egreso separado.
+            const cashSalesGross = await window.electronAPI.database.get(`
+                SELECT COALESCE(SUM(total), 0) AS total
+                FROM sales
+                WHERE payment_method = 'efectivo'
+                  AND created_at >= ?
+                  AND user_id = ?
+            `, [openedAt, reg.opened_by]);
+
             return {
-                byPayment: Array.isArray(byPayment) ? byPayment : [],
-                total:     totals?.total || 0,
-                count:     totals?.count || 0,
+                byPayment:      Array.isArray(byPayment) ? byPayment : [],
+                total:          totals?.total || 0,
+                count:          totals?.count || 0,
+                cashSalesGross: cashSalesGross?.total || 0,
             };
         } catch (e) {
             console.error('getSalesSummary error:', e);
-            return { byPayment: [], total: 0, count: 0 };
+            return { byPayment: [], total: 0, count: 0, cashSalesGross: 0 };
         }
     }
 
-    // ── Obtener todas las ventas del turno ────────────────────────────────────
     async getSalesDetail(registerId) {
         try {
             const reg = await window.electronAPI.database.get(
@@ -198,14 +204,14 @@ class CashRegisterRepository {
 
             const openedAt = toSQLiteDate(reg.opened_at);
 
-            // CAJA PERSONAL: solo ventas del usuario que abrió la caja
+            // Se incluyen todas las ventas (incluso canceladas) para que
+            // la lista sea consistente con el arqueo de caja.
             const rows = await window.electronAPI.database.query(`
                 SELECT s.sale_number, s.total, s.payment_method, s.created_at,
-                       u.full_name as seller_name
+                       s.is_cancelled, u.full_name as seller_name
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.id
-                WHERE s.is_cancelled = 0
-                  AND s.created_at >= ?
+                WHERE s.created_at >= ?
                   AND s.user_id = ?
                 ORDER BY s.created_at ASC
             `, [openedAt, reg.opened_by]);
@@ -216,7 +222,6 @@ class CashRegisterRepository {
         }
     }
 
-    // ── Historial de sesiones (para admin) ────────────────────────────────────
     async getHistory(limit = 20) {
         try {
             const rows = await window.electronAPI.database.query(`

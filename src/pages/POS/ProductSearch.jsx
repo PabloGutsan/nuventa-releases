@@ -1,6 +1,6 @@
 // src/pages/POS/ProductSearch.jsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FiSearch, FiPackage, FiX, FiAlertTriangle } from 'react-icons/fi';
 import './ProductSearch.css';
 
@@ -17,7 +17,7 @@ const restoreFocus = (ref) => {
     );
 };
 
-// ── Dialog React (reemplaza window.alert — evita que los inputs queden pegados) ──
+// ── Dialog React ──────────────────────────────────────────────────────────────
 const AlertDialog = ({ message, onClose }) => {
     useEffect(() => {
         const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') onClose(); };
@@ -76,12 +76,49 @@ const hasAvailableStock = (product) => {
     return parseFloat(product.stock) > 0;
 };
 
+// ── Buscar productos (síncrono, sin depender de estado React) ─────────────────
+const searchProducts = (products, term) => {
+    if (!Array.isArray(products) || !term) return [];
+    const t = term.toLowerCase().trim();
+    return products
+        .filter(p => {
+            if (!p?.name) return false;
+            if (p.is_active === false || p.is_active === 0) return false;
+            return (
+                (p.name    || '').toLowerCase().includes(t) ||
+                (p.sku     || '').toLowerCase().includes(t) ||
+                (p.barcode || '').toLowerCase().includes(t)
+            );
+        })
+        .slice(0, 10);
+};
+
+// Match exacto de barcode o SKU (para pistola láser)
+const findExactMatch = (products, code) => {
+    if (!Array.isArray(products) || !code) return null;
+    const c = code.trim();
+    return products.find(p =>
+        p.is_active !== false && p.is_active !== 0 && (
+            (p.barcode && p.barcode === c) ||
+            (p.sku     && p.sku     === c)
+        )
+    ) || null;
+};
+
 // ── ProductSearch ─────────────────────────────────────────────────────────────
 const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
     const [searchTerm,       setSearchTerm]       = useState('');
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [selectedIndex,    setSelectedIndex]    = useState(0);
     const [alertMessage,     setAlertMessage]     = useState(null);
+
+    // ── Detección de pistola láser ────────────────────────────────────────────
+    // La pistola envía todos los caracteres en < 50ms por tecla y termina con Enter.
+    // Usamos refs para no depender del ciclo de render de React.
+    const lastKeyTime   = useRef(0);
+    const scannerBuffer = useRef('');
+    const scannerTimer  = useRef(null);
+    const SCANNER_MS    = 50; // umbral: gap < 50ms entre teclas = pistola
 
     const closeAlert = () => {
         setAlertMessage(null);
@@ -123,49 +160,18 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
         };
     }, [searchInputRef]);
 
-    // ── Filtrar ───────────────────────────────────────────────────────────────
+    // ── Filtrar al escribir manualmente ───────────────────────────────────────
     useEffect(() => {
-        if (!Array.isArray(products) || searchTerm.length === 0) {
+        if (searchTerm.length === 0) {
             setFilteredProducts([]);
             return;
         }
-        const term = searchTerm.toLowerCase();
-        const filtered = products
-            .filter(p => {
-                if (!p?.name) return false;
-                if (p.is_active === false || p.is_active === 0) return false;
-                return (
-                    (p.name    || '').toLowerCase().includes(term) ||
-                    (p.sku     || '').toLowerCase().includes(term) ||
-                    (p.barcode || '').toLowerCase().includes(term)
-                );
-            })
-            .slice(0, 10);
-        setFilteredProducts(filtered);
+        setFilteredProducts(searchProducts(products, searchTerm));
         setSelectedIndex(0);
     }, [searchTerm, products]);
 
-    // ── Teclado ───────────────────────────────────────────────────────────────
-    const handleKeyDown = (e) => {
-        if (filteredProducts.length === 0) return;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setSelectedIndex(prev => prev < filteredProducts.length - 1 ? prev + 1 : prev);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setSelectedIndex(prev => prev > 0 ? prev - 1 : 0);
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            if (filteredProducts[selectedIndex]) handleSelectProduct(filteredProducts[selectedIndex]);
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            setSearchTerm('');
-            setFilteredProducts([]);
-        }
-    };
-
     // ── Seleccionar producto ──────────────────────────────────────────────────
-    const handleSelectProduct = (product) => {
+    const handleSelectProduct = useCallback((product) => {
         try {
             if (!product || typeof product !== 'object') {
                 setAlertMessage('Error: producto inválido.');
@@ -177,7 +183,7 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
             }
 
             if (product.type === 'product') {
-                const isUnlimited   = product.unlimited_stock   === true || product.unlimited_stock   === 1;
+                const isUnlimited   = product.unlimited_stock    === true || product.unlimited_stock    === 1;
                 const allowNegative = product.allow_negative_stock === true || product.allow_negative_stock === 1;
                 if (!isUnlimited && !allowNegative) {
                     const stock     = parseFloat(product.stock) || 0;
@@ -195,6 +201,7 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
             setSearchTerm('');
             setFilteredProducts([]);
             setSelectedIndex(0);
+            scannerBuffer.current = '';
             requestAnimationFrame(() => {
                 searchInputRef.current?.focus();
                 setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -203,11 +210,85 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
             console.error('Error al seleccionar producto:', error);
             setAlertMessage('Error al agregar el producto al carrito.');
         }
+    }, [onAddToCart, searchInputRef]);
+
+    // ── Teclado ───────────────────────────────────────────────────────────────
+    const handleKeyDown = (e) => {
+        const now = Date.now();
+        const gap = now - lastKeyTime.current;
+        lastKeyTime.current = now;
+
+        // Acumular buffer de scanner (teclas muy rápidas, carácter a carácter)
+        if (e.key !== 'Enter' && e.key.length === 1 && gap < SCANNER_MS) {
+            if (scannerTimer.current) clearTimeout(scannerTimer.current);
+            scannerBuffer.current += e.key;
+            // Si no llega Enter en 300ms → no era scanner, limpiar buffer
+            scannerTimer.current = setTimeout(() => {
+                scannerBuffer.current = '';
+            }, 300);
+            // Dejar que el input reciba el carácter normalmente
+            return;
+        }
+
+        // ── Enter ─────────────────────────────────────────────────────────────
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (scannerTimer.current) clearTimeout(scannerTimer.current);
+
+            // Código a buscar: buffer del scanner o valor actual del input
+            const code = (scannerBuffer.current || e.target.value || searchTerm).trim();
+            scannerBuffer.current = '';
+
+            if (!code) return;
+
+            // 1) Match exacto por barcode/SKU (scanner)
+            const exact = findExactMatch(products, code);
+            if (exact) {
+                handleSelectProduct(exact);
+                return;
+            }
+
+            // 2) Hay resultados en pantalla → seleccionar el marcado
+            if (filteredProducts.length > 0) {
+                handleSelectProduct(filteredProducts[selectedIndex] || filteredProducts[0]);
+                return;
+            }
+
+            // 3) Búsqueda síncrona (estado React quizás no actualizó aún)
+            const syncResults = searchProducts(products, code);
+            if (syncResults.length === 1) {
+                handleSelectProduct(syncResults[0]);
+            } else if (syncResults.length > 1) {
+                setFilteredProducts(syncResults);
+                setSelectedIndex(0);
+            } else {
+                setAlertMessage(`No se encontró ningún producto con el código: "${code}"`);
+            }
+            return;
+        }
+
+        // ── Navegación con teclado ────────────────────────────────────────────
+        if (filteredProducts.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => prev < filteredProducts.length - 1 ? prev + 1 : prev);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => prev > 0 ? prev - 1 : 0);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setSearchTerm('');
+            setFilteredProducts([]);
+        }
     };
 
+    // ── Limpiar ───────────────────────────────────────────────────────────────
     const handleClearSearch = () => {
         setSearchTerm('');
         setFilteredProducts([]);
+        scannerBuffer.current = '';
+        if (scannerTimer.current) clearTimeout(scannerTimer.current);
         searchInputRef.current?.focus();
     };
 
@@ -225,7 +306,7 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                 <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Buscar por nombre, SKU o código de barras... (ESC para limpiar)"
+                    placeholder="Buscar por nombre, SKU o escanear código de barras..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -280,7 +361,8 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                                         )}
                                     </div>
                                     <div className="result-details">
-                                        {product.sku && <span>SKU: {product.sku}</span>}
+                                        {product.sku     && <span>SKU: {product.sku}</span>}
+                                        {product.barcode && <span>Cód: {product.barcode}</span>}
                                         <span className={getStockClassName(product)}>
                                             {getStockText(product)}
                                         </span>
@@ -299,7 +381,7 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                 <div className="no-results">
                     <FiPackage size={48} />
                     <p>No se encontraron productos</p>
-                    <small>Intenta con otro término de búsqueda</small>
+                    <small>Intenta con otro término o verifica el código de barras</small>
                 </div>
             )}
 

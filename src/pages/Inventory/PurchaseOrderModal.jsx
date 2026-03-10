@@ -285,6 +285,53 @@ const ProductRow = ({ row, index, onUpdate, onRemove, allProducts, isEditing }) 
     const inputRef = useRef(null);
     const wrapRef = useRef(null);
 
+    // ── Detección de pistola láser ────────────────────────────────────────────
+    // La pistola envía todos los caracteres en < 50ms por tecla y termina con Enter.
+    const lastKeyTime   = useRef(0);
+    const scannerBuffer = useRef('');
+    const scannerTimer  = useRef(null);
+    const SCANNER_MS    = 50;
+
+    const handleSearchKeyDown = (e) => {
+        const now = Date.now();
+        const gap = now - lastKeyTime.current;
+        lastKeyTime.current = now;
+
+        // Acumular buffer si las teclas vienen muy rápido (pistola)
+        if (e.key !== 'Enter' && e.key.length === 1 && gap < SCANNER_MS) {
+            if (scannerTimer.current) clearTimeout(scannerTimer.current);
+            scannerBuffer.current += e.key;
+            scannerTimer.current = setTimeout(() => { scannerBuffer.current = ''; }, 300);
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            if (scannerTimer.current) clearTimeout(scannerTimer.current);
+            const code = (scannerBuffer.current || e.target.value || searchTerm).trim();
+            scannerBuffer.current = '';
+
+            if (!code || row.productId) return;
+
+            // Match exacto por barcode o SKU (no servicios)
+            const exact = allProducts.find(p =>
+                p.type !== 'service' && (
+                    (p.barcode && p.barcode === code) ||
+                    (p.sku     && p.sku     === code)
+                )
+            );
+            if (exact) {
+                setShowDrop(false);
+                handleSelect(exact);
+            }
+            // Si no hay match exacto, el dropdown sigue mostrando resultados por texto
+        }
+
+        if (e.key === 'Escape') {
+            setShowDrop(false);
+            scannerBuffer.current = '';
+        }
+    };
+
     useEffect(() => {
         const h = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setShowDrop(false); };
         document.addEventListener('mousedown', h);
@@ -385,9 +432,10 @@ const ProductRow = ({ row, index, onUpdate, onRemove, allProducts, isEditing }) 
                         <div className="por-search-wrap">
                             <FiSearch size={13} className="por-search-icon" />
                             <input ref={inputRef} type="text" className="por-search-input"
-                                placeholder="Buscar nombre, SKU o código..."
+                                placeholder="Buscar nombre, SKU o escanear código..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyDown={handleSearchKeyDown}
                                 onFocus={() => (results.length > 0 || showCreateOption) && setShowDrop(true)}
                                 autoComplete="off" />
                             {showDrop && (results.length > 0 || showCreateOption) && createPortal(
@@ -400,6 +448,7 @@ const ProductRow = ({ row, index, onUpdate, onRemove, allProducts, isEditing }) 
                                             <div className="por-dd-name">{p.name}</div>
                                             <div className="por-dd-meta">
                                                 {p.sku && <span>SKU: {p.sku}</span>}
+                                                {p.barcode && <span>Cód: {p.barcode}</span>}
                                                 <span className={`por-dd-stock ${p.unlimited_stock ? 'unlimited' : p.stock <= 0 ? 'zero' : ''}`}>
                                                     {p.unlimited_stock ? 'Siempre disponible' : `Stock: ${fmtNum(p.stock)} ${p.unit_label || ''}`}
                                                 </span>
@@ -486,7 +535,6 @@ const ProductRow = ({ row, index, onUpdate, onRemove, allProducts, isEditing }) 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
-// ▶ CAMBIO: se agrega `purchase` como prop (null = nueva, objeto = editar)
 // ─────────────────────────────────────────────────────────────────────────────
 const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [], suppliers: suppliersProp = [], currentUser }) => {
     const today = (() => {
@@ -531,12 +579,10 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
 
     const [rows, setRows] = useState(() => Array.from({ length: 5 }, emptyRow));
 
-    // ── Sync suppliers desde prop ─────────────────────────────────────────────
     useEffect(() => {
         if (Array.isArray(suppliersProp)) setSuppliers(suppliersProp);
     }, [suppliersProp]);
 
-    // ▶ PRE-CARGAR ENCABEZADO si es edición ───────────────────────────────────
     useEffect(() => {
         if (!purchase) return;
         if (purchase.supplier_id)       setSupplierId(String(purchase.supplier_id));
@@ -550,10 +596,8 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
         if (purchase.tax_included !== undefined) setTaxIncluded(!!purchase.tax_included);
     }, [purchase]);
 
-    // ▶ PRE-CARGAR ÍTEMS si es edición ────────────────────────────────────────
     useEffect(() => {
         if (!purchase?.items?.length) return;
-
         const preloadedRows = purchase.items.map(item => {
             const isUnlimited = item.unlimited_stock === 1 || item.unlimited_stock === true;
             return {
@@ -571,13 +615,10 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                 isNew:            false,
             };
         });
-
-        // Rellenar con filas vacías hasta mínimo 5
         const extra = Math.max(0, 5 - preloadedRows.length);
         setRows([...preloadedRows, ...Array.from({ length: extra }, emptyRow)]);
     }, [purchase]);
 
-    // ── Recalcular IVA al cambiar tipo documento ──────────────────────────────
     useEffect(() => { setHasRecoverableTax(documentType === 'factura'); }, [documentType]);
 
     useEffect(() => {
@@ -608,12 +649,10 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
 
     const filledRows = rows.filter(r =>
         r.productId && parseFloat(r.unit_cost) >= 0 && (
-            r.isUnlimited
-                ? true                          // ilimitados: basta con tener producto y costo
-                : parseFloat(r.quantity) > 0    // normales: requieren cantidad
+            r.isUnlimited ? true : parseFloat(r.quantity) > 0
         )
     );
-    const activeItems  = filledRows.map(r => ({
+    const activeItems = filledRows.map(r => ({
         product_id:   r.productId,
         product_name: r.productName || '',
         quantity:     r.isUnlimited ? (parseFloat(r.quantity) || 1) : parseFloat(r.quantity),
@@ -674,7 +713,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
         } finally { setSavingQuickSupplier(false); }
     };
 
-    // ── Validar ───────────────────────────────────────────────────────────────
     const validate = () => {
         const errs = {};
         if (!purchaseDate) errs.purchaseDate = 'La fecha es obligatoria';
@@ -688,7 +726,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
         return Object.keys(errs).length === 0;
     };
 
-    // ── Guardar — CREATE o UPDATE según isEditing ─────────────────────────────
     const handleSave = async () => {
         if (!validate()) return;
         setSaving(true);
@@ -696,15 +733,10 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
             const ts = getLocalTimestamp();
 
             if (isEditing) {
-                // ── EDICIÓN: revertir stock original, actualizar cabecera e ítems ──
-
-                // 1. Obtener ítems originales para revertir stock
                 const originalItems = await window.electronAPI.database.query(
                     'SELECT product_id, quantity FROM purchase_items WHERE purchase_id = ?',
                     [purchase.id]
                 );
-
-                // 2. Revertir stock original
                 for (const orig of (originalItems || [])) {
                     try {
                         const prod = await window.electronAPI.database.get(
@@ -723,7 +755,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                     }
                 }
 
-                // 3. Calcular nuevos totales
                 const subtotal = activeItems.reduce((s, r) => s + (r.quantity * r.unit_cost), 0);
                 let tax = 0;
                 let total = subtotal;
@@ -732,7 +763,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                     else             { tax = subtotal * 0.19; total = subtotal + tax; }
                 }
 
-                // 4. UPDATE cabecera
                 await window.electronAPI.database.run(`
                     UPDATE purchases SET
                         supplier_id         = ?,
@@ -766,7 +796,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                     purchase.id,
                 ]);
 
-                // 5. Reemplazar ítems
                 await window.electronAPI.database.run(
                     'DELETE FROM purchase_items WHERE purchase_id = ?',
                     [purchase.id]
@@ -777,20 +806,11 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                             (purchase_id, product_id, product_name, quantity, unit_price, subtotal, tax, discount, total, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `, [
-                        purchase.id,
-                        item.product_id,
-                        item.product_name,
-                        item.quantity,
-                        item.unit_cost,
-                        item.quantity * item.unit_cost,
-                        0,
-                        0,
-                        item.quantity * item.unit_cost,
-                        ts,
+                        purchase.id, item.product_id, item.product_name, item.quantity, item.unit_cost,
+                        item.quantity * item.unit_cost, 0, 0, item.quantity * item.unit_cost, ts,
                     ]);
                 }
 
-                // 6. Aplicar nuevo stock y actualizar precios
                 for (const item of activeItems) {
                     try {
                         const prod = await window.electronAPI.database.get(
@@ -799,20 +819,17 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                         );
                         if (prod) {
                             if (!prod.unlimited_stock) {
-                                // Producto con stock normal: actualizar stock y costo
                                 const newStock = (parseFloat(prod.stock) || 0) + item.quantity;
                                 await window.electronAPI.database.run(
                                     'UPDATE products SET stock = ?, cost_price = ?, updated_at = ? WHERE id = ?',
                                     [newStock, item.unit_cost, ts, item.product_id]
                                 );
                             } else {
-                                // Producto ilimitado: solo actualizar costo (stock no se toca)
                                 await window.electronAPI.database.run(
                                     'UPDATE products SET cost_price = ?, updated_at = ? WHERE id = ?',
                                     [item.unit_cost, ts, item.product_id]
                                 );
                             }
-                            // Precio de venta: aplica a todos
                             if (item.sale_price && parseFloat(item.sale_price) > 0) {
                                 await window.electronAPI.database.run(
                                     'UPDATE products SET sale_price = ?, updated_at = ? WHERE id = ?',
@@ -828,32 +845,29 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                 setSavedMsg(`Compra ${purchase.purchase_number} actualizada correctamente`);
 
             } else {
-                // ── NUEVA COMPRA ──────────────────────────────────────────────
                 const result = await purchaseRepo.create({
-                    supplier_id:        supplierId ? parseInt(supplierId) : null,
-                    purchase_date:      purchaseDate,
-                    document_type:      documentType,
-                    document_number:    documentNumber || null,
+                    supplier_id:         supplierId ? parseInt(supplierId) : null,
+                    purchase_date:       purchaseDate,
+                    document_type:       documentType,
+                    document_number:     documentNumber || null,
                     has_recoverable_tax: hasRecoverableTax,
-                    tax_included:       taxIncluded,
-                    payment_condition:  paymentCondition,
-                    credit_days:        paymentCondition === 'credito' ? parseInt(creditDays) : 0,
-                    payment_method:     paymentMethod,
-                    items:              activeItems.map(i => ({ product_id: i.product_id, quantity: i.quantity, unit_cost: i.unit_cost })),
-                    notes:              notes || null,
-                    user_id:            currentUser?.id || null,
+                    tax_included:        taxIncluded,
+                    payment_condition:   paymentCondition,
+                    credit_days:         paymentCondition === 'credito' ? parseInt(creditDays) : 0,
+                    payment_method:      paymentMethod,
+                    items:               activeItems.map(i => ({ product_id: i.product_id, quantity: i.quantity, unit_cost: i.unit_cost })),
+                    notes:               notes || null,
+                    user_id:             currentUser?.id || null,
                 });
                 if (!result.success) throw new Error(result.error || 'Error desconocido');
 
                 for (const item of activeItems) {
-                    // Actualizar precio de venta para todos
                     if (item.sale_price && parseFloat(item.sale_price) > 0) {
                         await window.electronAPI.database.run(
                             'UPDATE products SET sale_price = ?, updated_at = ? WHERE id = ?',
                             [parseFloat(item.sale_price), ts, item.product_id]
                         );
                     }
-                    // Productos nuevos: actualizar costo; stock solo si NO es ilimitado
                     if (item.is_new) {
                         const prodCheck = await window.electronAPI.database.get(
                             'SELECT unlimited_stock FROM products WHERE id = ?',
@@ -885,7 +899,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
         }
     };
 
-    // ── Pantalla de éxito ─────────────────────────────────────────────────────
     if (savedOk) {
         return (
             <div className="pom-overlay">
@@ -903,7 +916,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
         );
     }
 
-    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="pom-overlay" onClick={(e) => e.target === e.currentTarget && !saving && onClose()}>
             <div className="pom-modal">
@@ -912,7 +924,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                     <div className="pom-header-left">
                         <div className="pom-header-icon"><FiTruck size={20} color="#2563eb" /></div>
                         <div>
-                            {/* ▶ Título dinámico */}
                             <h1 className="pom-title">
                                 {isEditing
                                     ? `Editar Compra — ${purchase.purchase_number}`
@@ -1052,14 +1063,12 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                             </select>
                         </div>
 
-                        {/* N° Documento */}
                         <div className="pom-field">
                             <label className="pom-label">N° Documento</label>
                             <input type="text" className="pom-input" placeholder="Ej: 001234"
                                 value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} disabled={saving} maxLength={60} />
                         </div>
 
-                        {/* Fecha */}
                         <div className="pom-field">
                             <label className="pom-label">📅 Fecha <span className="pom-required">*</span></label>
                             <input type="date" className={`pom-input ${errors.purchaseDate ? 'pom-input--error' : ''}`}
@@ -1067,7 +1076,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                             {errors.purchaseDate && <span className="pom-error-text">{errors.purchaseDate}</span>}
                         </div>
 
-                        {/* Condición pago */}
                         <div className="pom-field">
                             <label className="pom-label">💳 Condición de pago</label>
                             <select className="pom-input" value={paymentCondition} onChange={(e) => setPaymentCondition(e.target.value)} disabled={saving}>
@@ -1084,7 +1092,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                             </div>
                         )}
 
-                        {/* Método pago */}
                         <div className="pom-field">
                             <label className="pom-label">Método de pago</label>
                             <select className="pom-input" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} disabled={saving}>
@@ -1096,7 +1103,6 @@ const PurchaseOrderModal = ({ purchase = null, onClose, onSaved, allProducts = [
                             </select>
                         </div>
 
-                        {/* Notas */}
                         <div className="pom-field">
                             <label className="pom-label">📝 Notas</label>
                             <input type="text" className="pom-input" placeholder="Observaciones opcionales..."

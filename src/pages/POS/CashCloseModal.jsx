@@ -42,7 +42,6 @@ const PAYMENT_ICONS = {
     multiple:        '🔀',
 };
 
-// ── Ticket de cierre de caja — mismo estilo que Ticket.css ────────────────────
 const buildTicketHTML = ({
     businessName, businessLogo, register, currentUser,
     salesSummary, salesDetail, movements,
@@ -50,7 +49,10 @@ const buildTicketHTML = ({
 }) => {
     const totalIn   = movements.filter(m => m.type === 'in').reduce((a, m) => a + m.amount, 0);
     const totalOut  = movements.filter(m => m.type === 'out').reduce((a, m) => a + m.amount, 0);
-    const cashSales = salesSummary.byPayment.find(p => p.payment_method === 'efectivo')?.total || 0;
+    // cashSalesGross incluye ventas canceladas — para que el arqueo visual cuadre
+    // con expectedCash (que también las incluye).
+    const cashSales = salesSummary.cashSalesGross
+        ?? (salesSummary.byPayment.find(p => p.payment_method === 'efectivo')?.total || 0);
     const diff      = closingAmount - expectedCash;
     const diffLabel = diff === 0 ? 'CUADRE EXACTO ✓' : diff > 0 ? `SOBRANTE: ${fmt(diff)}` : `FALTANTE: ${fmt(Math.abs(diff))}`;
     const diffColor = diff === 0 ? '#15803d' : diff > 0 ? '#1d4ed8' : '#dc2626';
@@ -58,7 +60,6 @@ const buildTicketHTML = ({
     const logoHtml = businessLogo
         ? `<img src="${businessLogo}" alt="Logo" class="ticket-logo" />`
         : `<div class="ticket-logo-placeholder">🏪</div>`;
-
 
     const movRows = movements.map(m => `
         <div class="ticket-item">
@@ -81,7 +82,6 @@ const buildTicketHTML = ({
 <meta charset="UTF-8">
 <title>Cierre de Caja</title>
 <style>
-/* ── Mismos estilos que Ticket.css ── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: white; }
 .ticket {
@@ -99,7 +99,6 @@ body { background: white; }
 .ticket-divider { border: none; border-top: 1px solid #000; margin: 8px 0; width: 100%; }
 .ticket-info-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 9pt; }
 .ticket-sale-number { font-weight: bold; }
-/* Items */
 .ticket-items-subheader {
     display: grid; grid-template-columns: 22mm 1fr 1fr;
     gap: 2px; font-weight: bold; font-size: 8.5pt;
@@ -116,18 +115,14 @@ body { background: white; }
     display: grid; grid-template-columns: 22mm 1fr 1fr;
     gap: 2px; font-size: 9pt; margin-top: 1px;
 }
-/* Totales */
 .ticket-totals { margin: 6px 0; }
 .ticket-total-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 9.5pt; }
 .ticket-final { font-weight: bold; font-size: 12pt; margin-top: 6px; padding-top: 5px; border-top: 2px solid #000; }
-/* Footer */
 .ticket-footer { text-align: center; margin-top: 10px; padding-top: 6px; }
 .ticket-thanks { font-size: 10pt; font-weight: bold; margin: 8px 0; }
 .ticket-system { font-size: 7.5pt; color: #555; margin-top: 4px; }
-/* Diff box */
 .diff-box { padding: 6px 0; margin: 4px 0; text-align: center; }
 .diff-label { font-size: 12pt; font-weight: bold; }
-/* Sección títulos */
 .section-title { font-weight: bold; font-size: 8pt; letter-spacing: 0.5px; margin: 2px 0; }
 @media print {
     @page { size: 80mm auto; margin: 0 !important; }
@@ -143,46 +138,27 @@ body { background: white; }
 </head>
 <body>
 <div class="ticket">
-
-    <!-- Header -->
     <div class="ticket-header">
         ${logoHtml}
         <h1 class="ticket-business-name">${businessName || 'MI NEGOCIO'}</h1>
     </div>
-
     <hr class="ticket-divider">
-
-    <!-- Título del documento -->
-    <div style="text-align:center; font-weight:bold; font-size:11pt; margin:4px 0;">
-        CIERRE DE TURNO
-    </div>
-
+    <div style="text-align:center; font-weight:bold; font-size:11pt; margin:4px 0;">CIERRE DE TURNO</div>
     <hr class="ticket-divider">
-
-    <!-- Info del turno -->
     <div class="ticket-info-row"><span>Cajero:</span><span>${register?.opened_by_name || '—'}</span></div>
     <div class="ticket-info-row"><span>Apertura:</span><span>${fmtDateTime(register?.opened_at)}</span></div>
     <div class="ticket-info-row"><span>Cierre:</span><span>${closedAt}</span></div>
     <div class="ticket-info-row"><span>Cerrado por:</span><span>${register?.opened_by_name || currentUser?.full_name || currentUser?.username || '—'}</span></div>
-
     <hr class="ticket-divider">
-
-    <!-- Resumen de ventas -->
     <div class="section-title">VENTAS DEL TURNO</div>
     <div class="ticket-totals">
-        <div class="ticket-total-row ticket-final">
-            <span>Total ventas</span><span>${fmt(salesSummary.total)}</span>
-        </div>
-        <div class="ticket-total-row" style="color:#555">
-            <span>N° transacciones</span><span>${salesSummary.count}</span>
-        </div>
+        <div class="ticket-total-row ticket-final"><span>Total ventas</span><span>${fmt(salesSummary.total)}</span></div>
+        <div class="ticket-total-row" style="color:#555"><span>N° transacciones</span><span>${salesSummary.count}</span></div>
     </div>
-
     ${salesSummary.byPayment.length > 0 ? `
     <hr class="ticket-divider">
     <div class="section-title">POR MÉTODO DE PAGO</div>
     <div class="ticket-totals">${paymentRows}</div>` : ''}
-
     ${movements.length > 0 ? `
     <hr class="ticket-divider">
     <div class="section-title">MOVIMIENTOS DE EFECTIVO</div>
@@ -192,10 +168,7 @@ body { background: white; }
         <span class="col-total">MONTO</span>
     </div>
     <div class="ticket-items">${movRows}</div>` : ''}
-
     <hr class="ticket-divider">
-
-    <!-- Arqueo -->
     <div class="section-title">ARQUEO DE CAJA</div>
     <div class="ticket-totals">
         <div class="ticket-total-row"><span>Efectivo inicial</span><span>${fmt(register?.opening_amount)}</span></div>
@@ -205,31 +178,22 @@ body { background: white; }
         <div class="ticket-total-row ticket-final"><span>Esperado en caja</span><span>${fmt(expectedCash)}</span></div>
         <div class="ticket-total-row ticket-final"><span>Contado físico</span><span>${fmt(closingAmount)}</span></div>
     </div>
-
     <hr class="ticket-divider">
-
-    <!-- Diferencia -->
     <div class="diff-box">
         <div class="diff-label" style="color:${diffColor}">${diffLabel}</div>
     </div>
-
     ${notes ? `<hr class="ticket-divider"><div style="font-size:9pt"><strong>Notas:</strong> ${notes}</div>` : ''}
-
     <hr class="ticket-divider">
-
-    <!-- Footer -->
     <div class="ticket-footer">
         <p class="ticket-thanks">Resumen de turno</p>
         <p class="ticket-system">Sistema Punto de Ventas</p>
         <p class="ticket-system">NUVENTA.CL</p>
     </div>
-
 </div>
 </body>
 </html>`;
 };
 
-// ── Componente principal ───────────────────────────────────────────────────────
 const CashCloseModal = ({
     register, salesSummary, salesDetail, movements,
     expectedCash, businessName, businessLogo, currentUser,
@@ -241,7 +205,6 @@ const CashCloseModal = ({
     const [loading,       setLoading]       = useState(false);
     const [confirmed,     setConfirmed]     = useState(false);
     const [closedAt,      setClosedAt]      = useState('');
-    // Snapshot de datos antes de que el hook los limpie al cerrar
     const [snap,          setSnap]          = useState(null);
     const inputRef = useRef(null);
 
@@ -263,11 +226,12 @@ const CashCloseModal = ({
 
     const totalIn   = movements.filter(m => m.type === 'in').reduce((a, m) => a + m.amount, 0);
     const totalOut  = movements.filter(m => m.type === 'out').reduce((a, m) => a + m.amount, 0);
-    const cashSales = salesSummary.byPayment.find(p => p.payment_method === 'efectivo')?.total || 0;
+    // cashSalesGross incluye ventas canceladas — para que el arqueo visual cuadre
+    // con expectedCash (que también las incluye).
+    const cashSales = salesSummary.cashSalesGross
+        ?? (salesSummary.byPayment.find(p => p.payment_method === 'efectivo')?.total || 0);
 
     const handleConfirm = async () => {
-        // Guardar snapshot ANTES de llamar onConfirmClose,
-        // porque el hook limpia salesSummary/movements/etc al cerrar la caja
         const dataSnap = { salesSummary, salesDetail, movements, expectedCash, register };
         setSnap(dataSnap);
         setLoading(true);
@@ -279,6 +243,8 @@ const CashCloseModal = ({
             });
             setClosedAt(now);
             setConfirmed(true);
+            // Notificar al Header que la caja fue cerrada
+            window.dispatchEvent(new CustomEvent('cash:closed'));
         } catch {
             setSnap(null);
             setLoading(false);
@@ -288,8 +254,7 @@ const CashCloseModal = ({
     const handlePrint = () => {
         const d = snap || { salesSummary, salesDetail, movements, expectedCash, register };
         const html = buildTicketHTML({
-            businessName,
-            businessLogo,
+            businessName, businessLogo,
             register:      d.register,
             currentUser,
             salesSummary:  d.salesSummary,
@@ -354,7 +319,6 @@ const CashCloseModal = ({
         <div className="cc-overlay">
             <div className="cc-modal">
 
-                {/* Header */}
                 <div className="cc-header">
                     <div className="cc-header-left">
                         <div className="cc-header-icon"><FiDollarSign size={22} /></div>
@@ -370,11 +334,7 @@ const CashCloseModal = ({
                 </div>
 
                 <div className="cc-body">
-
-                    {/* Columna izquierda */}
                     <div className="cc-left">
-
-                        {/* Ventas */}
                         <div className="cc-section">
                             <h3 className="cc-section-title">
                                 <FiShoppingCart size={14} /> Ventas del turno
@@ -407,15 +367,20 @@ const CashCloseModal = ({
                                 <div className="cc-sales-table-wrap">
                                     <table className="cc-sales-table">
                                         <thead>
-                                            <tr><th>N°</th><th>Hora</th><th>Pago</th><th>Total</th></tr>
+                                            <tr><th>N°</th><th>Hora</th><th>Pago</th><th>Total</th><th></th></tr>
                                         </thead>
                                         <tbody>
                                             {salesDetail.map((s, i) => (
-                                                <tr key={i}>
+                                                <tr key={i} style={s.is_cancelled ? { opacity: 0.55 } : {}}>
                                                     <td>{s.sale_number}</td>
                                                     <td>{fmtTime(s.created_at)}</td>
                                                     <td><span className="cc-pm-badge">{PAYMENT_LABELS[s.payment_method] || s.payment_method}</span></td>
-                                                    <td className="cc-amount-cell">{fmt(s.total)}</td>
+                                                    <td className="cc-amount-cell" style={s.is_cancelled ? { textDecoration: 'line-through', color: '#9ca3af' } : {}}>
+                                                        {fmt(s.total)}
+                                                    </td>
+                                                    <td>
+                                                        {s.is_cancelled ? <span className="cc-cancelled-badge">Cancelada</span> : null}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -424,7 +389,6 @@ const CashCloseModal = ({
                             )}
                         </div>
 
-                        {/* Movimientos */}
                         {movements.length > 0 && (
                             <div className="cc-section">
                                 <h3 className="cc-section-title">Movimientos de efectivo</h3>
@@ -442,10 +406,7 @@ const CashCloseModal = ({
                         )}
                     </div>
 
-                    {/* Columna derecha */}
                     <div className="cc-right">
-
-                        {/* Arqueo */}
                         <div className="cc-section cc-arqueo">
                             <h3 className="cc-section-title">Arqueo de caja</h3>
                             <div className="cc-arqueo-rows">
@@ -472,7 +433,6 @@ const CashCloseModal = ({
                             </div>
                         </div>
 
-                        {/* Conteo físico */}
                         <div className="cc-section">
                             <h3 className="cc-section-title">¿Cuánto hay físicamente en caja?</h3>
                             <div className="cc-input-wrap">
@@ -506,7 +466,6 @@ const CashCloseModal = ({
                             )}
                         </div>
 
-                        {/* Notas */}
                         <div className="cc-section">
                             <h3 className="cc-section-title">Comentarios (opcional)</h3>
                             <textarea
@@ -518,7 +477,6 @@ const CashCloseModal = ({
                             />
                         </div>
 
-                        {/* Acciones */}
                         <div className="cc-actions">
                             <button className="cc-btn-cancel" onClick={onClose} disabled={loading}>
                                 Cancelar

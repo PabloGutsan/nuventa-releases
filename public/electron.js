@@ -7,6 +7,7 @@ const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const {
     activateLicense,
+    checkLicense,
     checkLocalLicense,
     clearLocalLicense
 } = require('./licenseManager');
@@ -164,6 +165,45 @@ function createWindow() {
 
     if (isDev) mainWindow.webContents.openDevTools();
 
+    // ── Confirmación al cerrar la app ─────────────────────────────────────
+    mainWindow.on('close', async (e) => {
+        if (app.isQuitting) return; // instalando update → dejar pasar
+
+        e.preventDefault(); // frenar el cierre mientras mostramos el dialog
+
+        try {
+            // Verificar si hay caja abierta
+            const openRegister = db
+                ? db.prepare(`SELECT id, opened_at FROM cash_registers WHERE status = 'open' LIMIT 1`).get()
+                : null;
+
+            const hasOpenCash = !!openRegister;
+
+            const message = hasOpenCash
+                ? `Hay una caja abierta desde ${new Date(openRegister.opened_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.\n\n¿Seguro que quieres cerrar Nuventa?`
+                : '¿Seguro que quieres cerrar Nuventa?';
+
+            const { response } = await dialog.showMessageBox(mainWindow, {
+                type:      hasOpenCash ? 'warning' : 'question',
+                buttons:   ['Cerrar Nuventa', 'Cancelar'],
+                defaultId: 1,
+                cancelId:  1,
+                title:     'Cerrar Nuventa',
+                message:   hasOpenCash ? '⚠️ Caja abierta' : 'Confirmar cierre',
+                detail:    message,
+            });
+
+            if (response === 0) {
+                app.isQuitting = true;
+                app.quit();
+            }
+        } catch (err) {
+            // Si falla el dialog, cerrar igual
+            app.isQuitting = true;
+            app.quit();
+        }
+    });
+
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -195,6 +235,7 @@ function initDatabase() {
 
         if (fs.existsSync(schemaPath)) {
             const schema = fs.readFileSync(schemaPath, 'utf8');
+
             db.exec(schema);
             console.log('✅ Database schema v2.0 initialized');
         } else {
@@ -263,7 +304,7 @@ ipcMain.handle('db-transaction', async (event, operations) => {
 // IPC — LICENCIA
 // ============================================================================
 
-ipcMain.handle('license:check',    async ()  => checkLocalLicense());
+ipcMain.handle('license:check',    async ()  => checkLicense());
 ipcMain.handle('license:activate', async (event, licenseKey, email, businessName) =>
     await activateLicense(licenseKey, email, businessName)
 );
@@ -455,6 +496,25 @@ app.whenReady().then(() => {
                 });
             }, 15000);
         }
+
+        // Verificar licencia periodicamente cada 60 minutos
+        setInterval(async () => {
+            try {
+                console.log("[License] Verificacion periodica...");
+                const result = await checkLicense();
+                if (!result.hasLicense || result.blocked) {
+                    console.warn("[License] Licencia invalida en verificacion periodica:", result.reason);
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send("license:revoked", {
+                            reason:  result.reason  || "INACTIVE",
+                            message: result.message || "Tu licencia ha sido cancelada. Contacta a soporte en nuventa.cl."
+                        });
+                    }
+                }
+            } catch (err) {
+                console.log("[License] Error en verificacion periodica:", err.message);
+            }
+        }, 60 * 60 * 1000);
     } else {
         app.quit();
     }

@@ -1,15 +1,41 @@
 // src/components/layout/Header.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { FiSearch, FiLogOut, FiX } from 'react-icons/fi';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { FiSearch, FiLogOut, FiX, FiBell } from 'react-icons/fi';
 import Button from '../common/Button';
 import './Header.css';
 
-// ── Dialog React (evita window.confirm que pega inputs en Electron) ───────────
+const CASH_MAX_HOURS = 12;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function horasAbiertas(openedAt) {
+    return (Date.now() - new Date(openedAt).getTime()) / (1000 * 60 * 60);
+}
+
+function formatHorasAbiertas(openedAt) {
+    const totalMinutos = Math.floor((Date.now() - new Date(openedAt).getTime()) / 60000);
+    const horas   = Math.floor(totalMinutos / 60);
+    const minutos = totalMinutos % 60;
+    if (horas === 0)   return `${minutos}min`;
+    if (minutos === 0) return `${horas}h`;
+    return `${horas}h ${minutos}min`;
+}
+
+function formatFechaAbierta(openedAt) {
+    const d    = new Date(openedAt);
+    const hoy  = new Date();
+    const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+    const hora = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === hoy.toDateString())  return `Hoy a las ${hora}`;
+    if (d.toDateString() === ayer.toDateString()) return `Ayer a las ${hora}`;
+    return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }) + ` a las ${hora}`;
+}
+
+// ── Dialog React ──────────────────────────────────────────────────────────────
 const HeaderDialog = ({ dialog }) => {
     useEffect(() => {
         if (!dialog) return;
         const onKey = (e) => {
-            if (e.key === 'Escape' && dialog.onCancel) dialog.onCancel();
+            if (e.key === 'Escape' && dialog.onCancel)  dialog.onCancel();
             if (e.key === 'Enter'  && dialog.onConfirm) dialog.onConfirm();
         };
         window.addEventListener('keydown', onKey);
@@ -40,14 +66,104 @@ const HeaderDialog = ({ dialog }) => {
     );
 };
 
-const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) => {
-    const [searchTerm,    setSearchTerm]    = useState('');
-    const [results,       setResults]       = useState([]);
-    const [showDropdown,  setShowDropdown]  = useState(false);
-    const [searching,     setSearching]     = useState(false);
-    const [dialog,        setDialog]        = useState(null);
+// ── Notificación de cajas abiertas ────────────────────────────────────────────
+const CashAlert = ({ user }) => {
+    const [cajasAbiertas, setCajasAbiertas] = useState([]);
+    const [open,          setOpen]          = useState(false);
+    const dropdownRef = useRef(null);
 
-    const searchRef  = useRef(null);
+    const loadCajas = useCallback(async () => {
+        if (!user) return;
+        try {
+            const sql = user.role === 'admin'
+                ? `SELECT cr.id, cr.opened_at, u.full_name as userName
+                   FROM cash_registers cr
+                   JOIN users u ON cr.opened_by = u.id
+                   WHERE cr.status = 'open'`
+                : `SELECT cr.id, cr.opened_at, u.full_name as userName
+                   FROM cash_registers cr
+                   JOIN users u ON cr.opened_by = u.id
+                   WHERE cr.status = 'open' AND cr.opened_by = ?`;
+            const params = user.role === 'admin' ? [] : [user.id];
+            const rows   = await window.electronAPI.database.query(sql, params);
+            const viejas = (rows || []).filter(r => horasAbiertas(r.opened_at) >= CASH_MAX_HOURS);
+            setCajasAbiertas(viejas);
+        } catch (err) {
+            console.error('[CashAlert] Error:', err);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        loadCajas();
+        const interval = setInterval(loadCajas, 5 * 60 * 1000);
+        window.addEventListener('cash:closed', loadCajas);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('cash:closed', loadCajas);
+        };
+    }, [loadCajas]);
+
+    useEffect(() => {
+        if (!open) return;
+        const handleClick = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [open]);
+
+    if (cajasAbiertas.length === 0) return null;
+
+    return (
+        <div className="cash-alert-wrapper" ref={dropdownRef}>
+            <button
+                className="cash-alert-btn"
+                onClick={() => setOpen(o => !o)}
+                title={`${cajasAbiertas.length} caja${cajasAbiertas.length > 1 ? 's' : ''} abierta${cajasAbiertas.length > 1 ? 's' : ''} por más de ${CASH_MAX_HOURS}h`}
+            >
+                <FiBell size={18} />
+                <span className="cash-alert-badge">{cajasAbiertas.length}</span>
+            </button>
+
+            {open && (
+                <div className="cash-alert-dropdown">
+                    <div className="cash-alert-header">
+                        ⚠️ {cajasAbiertas.length === 1
+                            ? 'Caja con mucho tiempo abierta'
+                            : `${cajasAbiertas.length} cajas con mucho tiempo abiertas`}
+                    </div>
+                    {cajasAbiertas.map(caja => (
+                        <div key={caja.id} className="cash-alert-item">
+                            <div className="cash-alert-item__user">
+                                <span className="cash-alert-item__avatar">
+                                    {caja.userName?.charAt(0)?.toUpperCase()}
+                                </span>
+                                <div>
+                                    <div className="cash-alert-item__name">{caja.userName}</div>
+                                    <div className="cash-alert-item__since">{formatFechaAbierta(caja.opened_at)}</div>
+                                </div>
+                            </div>
+                            <div className="cash-alert-item__time">
+                                {formatHorasAbiertas(caja.opened_at)}
+                            </div>
+                        </div>
+                    ))}
+
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ── Header principal ──────────────────────────────────────────────────────────
+const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) => {
+    const [searchTerm,   setSearchTerm]   = useState('');
+    const [results,      setResults]      = useState([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [searching,    setSearching]    = useState(false);
+    const [dialog,       setDialog]       = useState(null);
+
+    const searchRef   = useRef(null);
     const debounceRef = useRef(null);
 
     useEffect(() => {
@@ -91,7 +207,6 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
         setSearchTerm(''); setResults([]); setShowDropdown(false);
     };
 
-    // ── Verificar si el usuario tiene caja abierta ────────────────────────────
     const checkOpenRegister = async () => {
         try {
             const row = await window.electronAPI.database.get(
@@ -102,37 +217,15 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
                 [user?.id]
             );
             return row || null;
-        } catch {
-            return null;
-        }
+        } catch { return null; }
     };
 
-    // ── Logout con verificación de caja ──────────────────────────────────────
     const handleLogoutClick = async () => {
         const openRegister = await checkOpenRegister();
-
-        if (!openRegister) {
-            // Sin caja abierta → cerrar sesión directo
-            onLogout();
-            return;
-        }
-
-        // Tiene caja abierta → mostrar dialog de advertencia
+        if (!openRegister) { onLogout(); return; }
         setDialog({
             title:   '⚠️ Tienes una caja abierta',
-            message: `Tu caja lleva activa desde las ${
-                (() => {
-                    const d = new Date(openRegister.opened_at);
-                    const hoy = new Date();
-                    const esHoy = d.toDateString() === hoy.toDateString();
-                    const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
-                    const esAyer = d.toDateString() === ayer.toDateString();
-                    const hora = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-                    if (esHoy)  return `hoy a las ${hora}`;
-                    if (esAyer) return `ayer a las ${hora}`;
-                    return d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }) + ` a las ${hora}`;
-                })()
-            }. Si cierras sesión sin cerrar la caja, quedará disponible cuando vuelvas a iniciar sesión.`,
+            message: `Tu caja lleva activa desde ${formatFechaAbierta(openRegister.opened_at)}. Si cierras sesión sin cerrar la caja, quedará disponible cuando vuelvas a iniciar sesión.`,
             actions: [
                 {
                     label:     'Cerrar sesión igual',
@@ -183,14 +276,12 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
         <>
             <header className={`app-header ${sidebarOpen ? 'header-expanded' : 'header-collapsed'}`}>
 
-                {/* Marca */}
                 <div className="header-brand">
                     <span className="header-title">
                         Nu<span className="brand-v">v</span>enta
                     </span>
                 </div>
 
-                {/* Búsqueda rápida de stock */}
                 <div className="header-search" ref={searchRef}>
                     <FiSearch className="search-icon" />
                     <input
@@ -244,8 +335,10 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
                     )}
                 </div>
 
-                {/* Usuario + Logout */}
                 <div className="header-actions">
+                    {/* Alerta de caja abierta */}
+                    <CashAlert user={user} />
+
                     <div className="header-user">
                         <div className="user-avatar">
                             {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
@@ -266,7 +359,6 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
                 </div>
             </header>
 
-            {/* Dialog de advertencia de caja — fuera del header para z-index correcto */}
             <HeaderDialog dialog={dialog} />
         </>
     );

@@ -14,10 +14,8 @@ import {
 } from 'react-icons/fi';
 import './ProductList.css';
 
-// ── Detección de plataforma ───────────────────────────────────────────────────
 const isMac = () => window.electronAPI?.platform === 'darwin';
 
-// ── Helper: restaurar foco al input de búsqueda ───────────────────────────────
 const restoreFocus = (ref) => {
     requestAnimationFrame(() => {
         ref.current?.focus();
@@ -25,15 +23,12 @@ const restoreFocus = (ref) => {
     });
 };
 
-// ── PlDialog — reemplaza window.confirm / alert / success ────────────────────
-const PlDialog = ({ dialog, onClose }) => {
+const PlDialog = ({ dialog }) => {
     if (!dialog) return null;
     const isConfirm = dialog.type === 'confirm';
     const isSuccess = dialog.type === 'success';
     const handleOverlayClick = (e) => {
-        if (!isConfirm && e.target === e.currentTarget) {
-            dialog.onClose?.();
-        }
+        if (!isConfirm && e.target === e.currentTarget) dialog.onClose?.();
     };
     return (
         <div className="pl-dialog-overlay" onClick={handleOverlayClick}>
@@ -43,9 +38,7 @@ const PlDialog = ({ dialog, onClose }) => {
                 <div className="pl-dialog-actions">
                     {isConfirm && (
                         <>
-                            <button className="pl-dialog-btn pl-dialog-btn--cancel" onClick={dialog.onClose}>
-                                Cancelar
-                            </button>
+                            <button className="pl-dialog-btn pl-dialog-btn--cancel" onClick={dialog.onClose}>Cancelar</button>
                             <button className={`pl-dialog-btn pl-dialog-btn--${dialog.confirmVariant || 'danger'}`} onClick={dialog.onConfirm}>
                                 {dialog.confirmLabel || 'Confirmar'}
                             </button>
@@ -85,12 +78,17 @@ const ProductList = () => {
     const [loading,           setLoading]           = useState(true);
     const [exporting,         setExporting]         = useState(null);
     const [dialog,            setDialog]            = useState(null);
-
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [suppliers,         setSuppliers]         = useState([]);
 
     const scannerInputRef = useRef(null);
     const searchInputRef  = useRef(null);
+
+    // Detección de pistola láser en buscador principal
+    const lastKeyTime   = useRef(0);
+    const scannerBuffer = useRef('');
+    const scannerTimer  = useRef(null);
+    const SCANNER_MS    = 50;
 
     const productRepo = new ProductRepository(db);
 
@@ -99,9 +97,7 @@ const ProductList = () => {
 
     useEffect(() => {
         const handleKeyPress = (e) => {
-            // F2 en Windows/Linux | Cmd+B en Mac (F2 = brillo en Mac)
-            const isActivate = e.key === 'F2' ||
-                (isMac() && e.metaKey && e.key === 'b');
+            const isActivate = e.key === 'F2' || (isMac() && e.metaKey && e.key === 'b');
             if (isActivate) { e.preventDefault(); activateScanner(); }
         };
         window.addEventListener('keydown', handleKeyPress);
@@ -138,22 +134,16 @@ const ProductList = () => {
                 'WHERE p.is_active = 1 ORDER BY p.name ASC'
             );
             if (!Array.isArray(data)) { setProducts([]); setFilteredProducts([]); return; }
-            const productsWithCalculations = data.map(product => {
-                const costPrice        = parseFloat(product.cost_price) || 0;
-                const salePrice        = parseFloat(product.sale_price) || 0;
-                const profitAmount     = salePrice - costPrice;
-                const profitPercentage = costPrice > 0
-                    ? ((profitAmount / costPrice) * 100).toFixed(2) : 0;
-                return {
-                    ...product,
-                    profit_amount:      profitAmount,
-                    profit_percentage:  profitPercentage,
-                    stock:              parseInt(product.stock) || 0,
-                    min_stock:          parseInt(product.min_stock) || 0
-                };
-            });
-            setProducts(productsWithCalculations);
-            setFilteredProducts(productsWithCalculations);
+            const mapped = data.map(p => ({
+                ...p,
+                profit_amount:     (parseFloat(p.sale_price) || 0) - (parseFloat(p.cost_price) || 0),
+                profit_percentage: (parseFloat(p.cost_price) || 0) > 0
+                    ? ((((parseFloat(p.sale_price) || 0) - (parseFloat(p.cost_price) || 0)) / (parseFloat(p.cost_price) || 0)) * 100).toFixed(2) : 0,
+                stock:     parseInt(p.stock)     || 0,
+                min_stock: parseInt(p.min_stock) || 0,
+            }));
+            setProducts(mapped);
+            setFilteredProducts(mapped);
         } catch (error) {
             console.error('Error loading products:', error);
             setProducts([]); setFilteredProducts([]);
@@ -164,10 +154,7 @@ const ProductList = () => {
         try {
             const data = await productRepo.getCategories();
             setCategories(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Error loading categories:', error);
-            setCategories([]);
-        }
+        } catch (error) { setCategories([]); }
     };
 
     const loadSuppliers = async () => {
@@ -176,10 +163,7 @@ const ProductList = () => {
                 'SELECT id, business_name, contact_name FROM suppliers WHERE is_active = 1 ORDER BY business_name ASC'
             );
             setSuppliers(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Error loading suppliers:', error);
-            setSuppliers([]);
-        }
+        } catch (error) { setSuppliers([]); }
     };
 
     const filterProducts = () => {
@@ -203,12 +187,9 @@ const ProductList = () => {
     const handleExport = async (type) => {
         setExporting(type);
         try {
-            const businessInfo = await window.electronAPI.database.get(
-                'SELECT name FROM business_info WHERE id = 1'
-            );
+            const businessInfo = await window.electronAPI.database.get('SELECT name FROM business_info WHERE id = 1');
             const activeCategoryName = selectedCategory !== 'all'
-                ? categories.find(c => String(c.id) === String(selectedCategory))?.name
-                : null;
+                ? categories.find(c => String(c.id) === String(selectedCategory))?.name : null;
             const params = {
                 products: filteredProducts,
                 filters:  { type: selectedType, category: activeCategoryName, search: searchTerm || null },
@@ -223,10 +204,7 @@ const ProductList = () => {
         }
     };
 
-    const handleCreateProduct = () => {
-        setEditingProduct(null);
-        setShowModal(true);
-    };
+    const handleCreateProduct = () => { setEditingProduct(null); setShowModal(true); };
 
     const handleEditProduct = (product) => {
         if (!product || typeof product !== 'object') return;
@@ -238,29 +216,22 @@ const ProductList = () => {
         if (!product || typeof product !== 'object') return;
         const tipo = product.type === 'service' ? 'servicio' : 'producto';
         setDialog({
-            type:           'confirm',
-            icon:           '🗑️',
-            message:        `¿Eliminar el ${tipo} "${product.name}"?\nEsta acción no se puede deshacer.`,
-            confirmLabel:   'Eliminar',
-            confirmVariant: 'danger',
+            type: 'confirm', icon: '🗑️',
+            message: `¿Eliminar el ${tipo} "${product.name}"?\nEsta acción no se puede deshacer.`,
+            confirmLabel: 'Eliminar', confirmVariant: 'danger',
             onConfirm: async () => {
                 setDialog(null);
                 try {
-                    await window.electronAPI.database.run(
-                        'UPDATE products SET is_active = 0 WHERE id = ?',
-                        [product.id]
-                    );
+                    await window.electronAPI.database.run('UPDATE products SET is_active = 0 WHERE id = ?', [product.id]);
                     await loadProducts();
                     setDialog({
-                        type:    'success',
-                        icon:    '✅',
+                        type: 'success', icon: '✅',
                         message: `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} "${product.name}" eliminado exitosamente`,
                         onClose: () => { setDialog(null); restoreFocus(searchInputRef); }
                     });
                 } catch (error) {
                     setDialog({
-                        type:    'error',
-                        icon:    '⚠️',
+                        type: 'error', icon: '⚠️',
                         message: error.message || 'Error desconocido',
                         onClose: () => { setDialog(null); restoreFocus(searchInputRef); }
                     });
@@ -282,25 +253,75 @@ const ProductList = () => {
         setTimeout(() => scannerInputRef.current?.focus(), 100);
     };
 
+    // Scanner modal F2 — busca y abre editor
     const handleScannerInput = async (e) => {
         if (e.key === 'Enter' && scannedCode?.trim()) {
+            const code = scannedCode.trim();
+            setScannerActive(false);
+            setScannedCode('');
             try {
-                const product = await productRepo.getByBarcode(scannedCode.trim());
+                const product = await productRepo.getByBarcode(code);
                 if (product && typeof product === 'object') {
                     handleEditProduct(product);
                 } else {
-                    alert(`Producto con código "${scannedCode}" no encontrado`);
+                    setDialog({
+                        type: 'error', icon: '🔍',
+                        message: `No se encontró ningún producto con el código "${code}"`,
+                        onClose: () => { setDialog(null); restoreFocus(searchInputRef); }
+                    });
                 }
-            } catch (error) {
-                alert('Error al buscar el producto');
+            } catch {
+                setDialog({
+                    type: 'error', icon: '⚠️',
+                    message: 'Error al buscar el producto. Intenta de nuevo.',
+                    onClose: () => { setDialog(null); restoreFocus(searchInputRef); }
+                });
             } finally {
-                setScannerActive(false);
-                setScannedCode('');
                 restoreFocus(searchInputRef);
             }
         } else if (e.key === 'Escape') {
             setScannerActive(false);
             setScannedCode('');
+            restoreFocus(searchInputRef);
+        }
+    };
+
+    // Buscador principal — soporte pistola láser directo (sin F2)
+    const handleSearchKeyDown = (e) => {
+        const now = Date.now();
+        const gap = now - lastKeyTime.current;
+        lastKeyTime.current = now;
+
+        // Acumular en buffer si las teclas vienen muy rápido (pistola)
+        if (e.key !== 'Enter' && e.key.length === 1 && gap < SCANNER_MS) {
+            if (scannerTimer.current) clearTimeout(scannerTimer.current);
+            scannerBuffer.current += e.key;
+            scannerTimer.current = setTimeout(() => { scannerBuffer.current = ''; }, 300);
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            if (scannerTimer.current) clearTimeout(scannerTimer.current);
+            const code = (scannerBuffer.current || e.target.value || searchTerm).trim();
+            scannerBuffer.current = '';
+            if (!code) return;
+
+            // Match exacto por barcode o SKU → abrir editor directamente
+            const exact = products.find(p =>
+                p.is_active !== false && p.is_active !== 0 && (
+                    (p.barcode && p.barcode === code) ||
+                    (p.sku     && p.sku     === code)
+                )
+            );
+            if (exact) {
+                setSearchTerm('');
+                handleEditProduct(exact);
+            }
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            setSearchTerm('');
             restoreFocus(searchInputRef);
         }
     };
@@ -319,8 +340,6 @@ const ProductList = () => {
     };
 
     const stats = getStats();
-
-    // Label del botón scanner según plataforma
     const scannerLabel = isMac() ? 'Scanner (⌘B)' : 'Scanner (F2)';
 
     if (loading) {
@@ -340,64 +359,42 @@ const ProductList = () => {
         <div className="main-content-scrollable">
             <div className="product-list">
 
-                {/* 1. HEADER */}
                 <div className="page-header">
                     <div>
                         <h1 className="page-title">Inventario</h1>
                         <p className="page-subtitle">Gestiona tu catálogo de productos y servicios</p>
                     </div>
                     <div className="pl-header-actions">
-                        <button
-                            className="rp-btn-export rp-btn-excel"
-                            onClick={() => handleExport('excel')}
-                            disabled={loading || exporting !== null || filteredProducts.length === 0}
-                        >
-                            <FiDownload size={14} />
-                            {exporting === 'excel' ? 'Descargando...' : 'Descargar Excel'}
+                        <button className="rp-btn-export rp-btn-excel" onClick={() => handleExport('excel')}
+                            disabled={loading || exporting !== null || filteredProducts.length === 0}>
+                            <FiDownload size={14} />{exporting === 'excel' ? 'Descargando...' : 'Descargar Excel'}
                         </button>
-                        <button
-                            className="rp-btn-export rp-btn-pdf"
-                            onClick={() => handleExport('pdf')}
-                            disabled={loading || exporting !== null || filteredProducts.length === 0}
-                        >
-                            <FiDownload size={14} />
-                            {exporting === 'pdf' ? 'Descargando...' : 'Descargar PDF'}
+                        <button className="rp-btn-export rp-btn-pdf" onClick={() => handleExport('pdf')}
+                            disabled={loading || exporting !== null || filteredProducts.length === 0}>
+                            <FiDownload size={14} />{exporting === 'pdf' ? 'Descargando...' : 'Descargar PDF'}
                         </button>
                         <button className="rp-refresh" onClick={loadData} disabled={loading}>
-                            <FiRefreshCw size={14} className={loading ? 'spin' : ''} />
-                            Actualizar
+                            <FiRefreshCw size={14} className={loading ? 'spin' : ''} />Actualizar
                         </button>
-
-                        <button
-                            className="rp-btn-export pl-btn-purchase"
-                            onClick={() => setShowPurchaseModal(true)}
-                            disabled={loading}
-                        >
-                            <FiTruck size={14} />
-                            Registrar Compra
+                        <button className="rp-btn-export pl-btn-purchase" onClick={() => setShowPurchaseModal(true)} disabled={loading}>
+                            <FiTruck size={14} />Registrar Compra
                         </button>
-
                         <Button variant="primary" icon={<FiPlus />} onClick={handleCreateProduct}>
                             Nuevo Producto/Servicio
                         </Button>
                     </div>
                 </div>
 
-                {/* 2. STATS */}
                 <div className="inventory-stats">
                     <div className="stat-item">
-                        <div className="stat-icon-wrap stat-icon-wrap--blue">
-                            <FiPackage size={20} color="#2563eb" />
-                        </div>
+                        <div className="stat-icon-wrap stat-icon-wrap--blue"><FiPackage size={20} color="#2563eb" /></div>
                         <div className="stat-item-body">
                             <div className="stat-value">{stats.total}</div>
                             <div className="stat-label">Total Items</div>
                         </div>
                     </div>
                     <div className="stat-item warning">
-                        <div className="stat-icon-wrap stat-icon-wrap--warning">
-                            <FiAlertCircle size={20} color="#f59e0b" />
-                        </div>
+                        <div className="stat-icon-wrap stat-icon-wrap--warning"><FiAlertCircle size={20} color="#f59e0b" /></div>
                         <div className="stat-item-body">
                             <div className="stat-value">{stats.lowStock}</div>
                             <div className="stat-label">Productos con Stock Bajo</div>
@@ -405,10 +402,9 @@ const ProductList = () => {
                     </div>
                 </div>
 
-                {/* 3. TOOLBAR */}
                 <div className="pl-toolbar">
                     <div className="type-tabs">
-                        <button className={`type-tab ${selectedType === 'all' ? 'active' : ''}`} onClick={() => setSelectedType('all')}>
+                        <button className={`type-tab ${selectedType === 'all'     ? 'active' : ''}`} onClick={() => setSelectedType('all')}>
                             <span className="tab-icon">📋</span><span className="tab-label">Todos</span>
                             <span className="tab-count">{filteredProducts.length}</span>
                         </button>
@@ -427,25 +423,23 @@ const ProductList = () => {
                         <input
                             ref={searchInputRef}
                             type="text"
-                            placeholder="Buscar por nombre, SKU o código de barras..."
+                            placeholder="Buscar por nombre, SKU o escanear código de barras..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={handleSearchKeyDown}
                             className="pl-search-input"
                         />
                         {searchTerm && (
-                            <button className="pl-search-clear" onClick={() => { setSearchTerm(''); restoreFocus(searchInputRef); }} title="Limpiar búsqueda">
-                                ✕
-                            </button>
+                            <button className="pl-search-clear"
+                                onClick={() => { setSearchTerm(''); restoreFocus(searchInputRef); }}
+                                title="Limpiar búsqueda">✕</button>
                         )}
                     </div>
 
-                    {/* Categoría searchable */}
                     <div className="pl-category-wrap" ref={categoryRef}>
-                        <button
-                            type="button"
+                        <button type="button"
                             className={`pl-category-trigger ${categoryOpen ? 'open' : ''}`}
-                            onClick={() => { setCategoryOpen(v => !v); setCategorySearch(''); }}
-                        >
+                            onClick={() => { setCategoryOpen(v => !v); setCategorySearch(''); }}>
                             <FiTag size={14} className="pl-cat-icon" />
                             <span className={`pl-cat-text ${selectedCategory !== 'all' ? 'selected' : ''}`}>
                                 {selectedCategory === 'all'
@@ -458,33 +452,23 @@ const ProductList = () => {
                             <div className="pl-category-dropdown">
                                 <div className="pl-cat-search">
                                     <FiSearch size={13} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar categoría..."
-                                        value={categorySearch}
-                                        onChange={(e) => setCategorySearch(e.target.value)}
-                                        autoFocus
-                                    />
+                                    <input type="text" placeholder="Buscar categoría..."
+                                        value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} autoFocus />
                                 </div>
                                 <div className="pl-cat-list">
-                                    <div
-                                        className={`pl-cat-option ${selectedCategory === 'all' ? 'selected' : ''}`}
-                                        onClick={() => { setSelectedCategory('all'); setCategoryOpen(false); setCategorySearch(''); }}
-                                    >
+                                    <div className={`pl-cat-option ${selectedCategory === 'all' ? 'selected' : ''}`}
+                                        onClick={() => { setSelectedCategory('all'); setCategoryOpen(false); setCategorySearch(''); }}>
                                         <span className="pl-cat-option-name">Todas las categorías</span>
                                     </div>
                                     {categories
                                         .filter(c => (c.name || '').toLowerCase().includes(categorySearch.toLowerCase()))
                                         .map(cat => (
-                                            <div
-                                                key={cat.id}
+                                            <div key={cat.id}
                                                 className={`pl-cat-option ${String(selectedCategory) === String(cat.id) ? 'selected' : ''}`}
-                                                onClick={() => { setSelectedCategory(String(cat.id)); setCategoryOpen(false); setCategorySearch(''); }}
-                                            >
+                                                onClick={() => { setSelectedCategory(String(cat.id)); setCategoryOpen(false); setCategorySearch(''); }}>
                                                 <span className="pl-cat-option-name">{cat.name}</span>
                                             </div>
-                                        ))
-                                    }
+                                        ))}
                                     {categorySearch && categories.filter(c =>
                                         (c.name || '').toLowerCase().includes(categorySearch.toLowerCase())
                                     ).length === 0 && (
@@ -505,7 +489,6 @@ const ProductList = () => {
                     </Button>
                 </div>
 
-                {/* 4. TABLA */}
                 <Card>
                     <div className="table-container">
                         {filteredProducts.length === 0 ? (
@@ -545,13 +528,9 @@ const ProductList = () => {
                                                 <div className="product-name-cell">
                                                     <div className="product-name-with-badge">
                                                         <strong>{product.name}</strong>
-                                                        {product.type === 'service' && (
-                                                            <span className="service-badge">Servicio</span>
-                                                        )}
+                                                        {product.type === 'service' && <span className="service-badge">Servicio</span>}
                                                     </div>
-                                                    {product.description && (
-                                                        <span className="product-desc">{product.description}</span>
-                                                    )}
+                                                    {product.description && <span className="product-desc">{product.description}</span>}
                                                 </div>
                                             </td>
                                             <td>
@@ -561,11 +540,7 @@ const ProductList = () => {
                                                     {!product.sku && !product.barcode && <span style={{ color: '#9ca3af' }}>-</span>}
                                                 </div>
                                             </td>
-                                            <td>
-                                                <span className="category-badge">
-                                                    {product.category_name || 'Sin categoría'}
-                                                </span>
-                                            </td>
+                                            <td><span className="category-badge">{product.category_name || 'Sin categoría'}</span></td>
                                             <td>
                                                 {product.type === 'service' ? (
                                                     <span className={`availability-badge ${product.is_active ? 'available' : 'unavailable'}`}>
@@ -589,15 +564,9 @@ const ProductList = () => {
                                             </td>
                                             <td>
                                                 <div className="action-buttons">
-                                                    <button className="action-btn view" onClick={() => setSelectedProduct(product)} title="Ver detalle">
-                                                        <FiEye />
-                                                    </button>
-                                                    <button className="action-btn edit" onClick={() => handleEditProduct(product)} title="Editar">
-                                                        <FiEdit2 />
-                                                    </button>
-                                                    <button className="action-btn delete" onClick={() => handleDeleteProduct(product)} title="Eliminar">
-                                                        <FiTrash2 />
-                                                    </button>
+                                                    <button className="action-btn view" onClick={() => setSelectedProduct(product)} title="Ver detalle"><FiEye /></button>
+                                                    <button className="action-btn edit" onClick={() => handleEditProduct(product)} title="Editar"><FiEdit2 /></button>
+                                                    <button className="action-btn delete" onClick={() => handleDeleteProduct(product)} title="Eliminar"><FiTrash2 /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -608,54 +577,25 @@ const ProductList = () => {
                     </div>
                 </Card>
 
-                {/* Modal editar/crear */}
                 {showModal && (
-                    <ProductModal
-                        product={editingProduct}
-                        categories={categories}
+                    <ProductModal product={editingProduct} categories={categories}
                         onSave={handleSaveProduct}
-                        onClose={() => {
-                            setShowModal(false);
-                            restoreFocus(searchInputRef);
-                        }}
-                        db={db}
-                    />
+                        onClose={() => { setShowModal(false); restoreFocus(searchInputRef); }}
+                        db={db} />
                 )}
 
-                {/* Modal detalle */}
                 {selectedProduct && (
-                    <ProductDetailModal
-                        product={selectedProduct}
-                        onClose={() => {
-                            setSelectedProduct(null);
-                            restoreFocus(searchInputRef);
-                        }}
-                        onEdit={(p) => {
-                            setSelectedProduct(null);
-                            handleEditProduct(p);
-                        }}
-                    />
+                    <ProductDetailModal product={selectedProduct}
+                        onClose={() => { setSelectedProduct(null); restoreFocus(searchInputRef); }}
+                        onEdit={(p) => { setSelectedProduct(null); handleEditProduct(p); }} />
                 )}
 
-                {/* Modal Registrar Compra */}
                 {showPurchaseModal && (
-                    <PurchaseOrderModal
-                        allProducts={products}
-                        suppliers={suppliers}
-                        currentUser={null}
-                        onClose={() => {
-                            setShowPurchaseModal(false);
-                            restoreFocus(searchInputRef);
-                        }}
-                        onSaved={async () => {
-                            setShowPurchaseModal(false);
-                            await loadProducts();
-                            restoreFocus(searchInputRef);
-                        }}
-                    />
+                    <PurchaseOrderModal allProducts={products} suppliers={suppliers} currentUser={null}
+                        onClose={() => { setShowPurchaseModal(false); restoreFocus(searchInputRef); }}
+                        onSaved={async () => { setShowPurchaseModal(false); await loadProducts(); restoreFocus(searchInputRef); }} />
                 )}
 
-                {/* Scanner Modal */}
                 {scannerActive && (
                     <div className="scanner-modal" onClick={() => { setScannerActive(false); restoreFocus(searchInputRef); }}>
                         <div className="scanner-content" onClick={(e) => e.stopPropagation()}>

@@ -4,16 +4,7 @@ import Input from '../../components/common/Input';
 import Card from '../../components/common/Card';
 import './Login.css';
 
-// const API_URL = process.env.REACT_APP_API_URL || 'https://francina-forensic-inflatedly.ngrok-free.dev';
 const API_URL = process.env.REACT_APP_API_URL || 'https://api.nuventa.cl';
-
-
-// ── Pasos del flujo de recuperación ──────────────────────────────────────
-// 'idle'     → login normal
-// 'form'     → pide email + clave de licencia
-// 'code'     → pide código de 6 dígitos
-// 'newpass'  → pide nueva contraseña
-// 'success'  → contraseña cambiada
 
 export default function Login({ onLogin }) {
     const [username, setUsername] = useState('');
@@ -21,7 +12,6 @@ export default function Login({ onLogin }) {
     const [error, setError]       = useState('');
     const [loading, setLoading]   = useState(false);
 
-    // Recuperación
     const [recover, setRecover]               = useState('idle');
     const [recoverForm, setRecoverForm]       = useState({ email: '', licenseKey: '', code: '', newPassword: '', confirmPassword: '' });
     const [recoverError, setRecoverError]     = useState('');
@@ -62,6 +52,13 @@ export default function Login({ onLogin }) {
         e.preventDefault();
         const { email, licenseKey } = recoverForm;
         if (!email || !licenseKey) { setRecoverError('Completa todos los campos.'); return; }
+
+        // Verificar conectividad antes de intentar enviar el código
+        if (!navigator.onLine) {
+            setRecoverError('⚠️ Sin conexión a internet. Conéctate e intenta nuevamente — necesitas internet para recibir el código en tu correo.');
+            return;
+        }
+
         setRecoverLoading(true);
         try {
             const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
@@ -72,9 +69,15 @@ export default function Login({ onLogin }) {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Error al enviar el código');
             setMaskedEmail(data.maskedEmail || email);
+            setRecoverError('');
             setRecover('code');
         } catch (err) {
-            setRecoverError(err.message);
+            // Si el fetch falla por red, dar mensaje más claro
+            if (!navigator.onLine || err.message === 'Failed to fetch') {
+                setRecoverError('⚠️ Sin conexión a internet. Conéctate e intenta nuevamente — necesitas internet para recibir el código en tu correo.');
+            } else {
+                setRecoverError(err.message);
+            }
         } finally {
             setRecoverLoading(false);
         }

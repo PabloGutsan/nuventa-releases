@@ -1,7 +1,6 @@
 -- ============================================================================
--- SISTEMA DE GESTIÓN COMERCIAL POS - ESQUEMA DE BASE DE DATOS
--- Base de Datos: SQLite
--- Versión: 2.0 (consolidado — todas las migraciones integradas)
+-- NUVENTA - ESQUEMA DE BASE DE DATOS
+-- SQLite — Versión 2.0 consolidada
 -- ============================================================================
 
 -- ============================================================================
@@ -35,7 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
     email                TEXT,
     role                 TEXT NOT NULL CHECK(role IN ('admin', 'vendedor', 'inventario')),
     is_active            BOOLEAN DEFAULT 1,
-    must_change_password INTEGER DEFAULT 0,     -- ← migración: forzar cambio de clave
+    must_change_password INTEGER DEFAULT 0,
     last_login           DATETIME,
     created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at           DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -86,7 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_categories_is_active ON categories(is_active);
 CREATE TABLE IF NOT EXISTS suppliers (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     name            TEXT NOT NULL,
-    legal_name      TEXT,                       -- ← migración
+    legal_name      TEXT,
     business_name   TEXT,
     rut             TEXT UNIQUE,
     contact_name    TEXT,
@@ -94,10 +93,10 @@ CREATE TABLE IF NOT EXISTS suppliers (
     email           TEXT,
     address         TEXT,
     city            TEXT,
-    region          TEXT,                       -- ← migración
+    region          TEXT,
     country         TEXT DEFAULT 'Chile',
     website         TEXT,
-    industry        TEXT,                       -- ← migración
+    industry        TEXT,
     payment_terms   TEXT,
     payment_methods TEXT,
     credit_days     INTEGER DEFAULT 0,
@@ -131,12 +130,12 @@ CREATE TABLE IF NOT EXISTS products (
                          ) STORED,
     stock                INTEGER DEFAULT 0,
     min_stock            INTEGER DEFAULT 0,
-    max_stock            INTEGER,               -- ← migración
+    max_stock            INTEGER,
     unit                 TEXT DEFAULT 'unidad',
-    tax_rate             DECIMAL(5,2) DEFAULT 19.00, -- ← migración
+    tax_rate             DECIMAL(5,2) DEFAULT 19.00,
     image_path           TEXT,
     is_active            BOOLEAN DEFAULT 1,
-    allow_negative_stock BOOLEAN DEFAULT 0,     -- ← migración
+    allow_negative_stock BOOLEAN DEFAULT 0,
     type                 TEXT DEFAULT 'product' CHECK(type IN ('product', 'service')),
     unit_type            TEXT DEFAULT 'unidad',
     unit_label           TEXT DEFAULT 'un',
@@ -183,7 +182,7 @@ CREATE INDEX IF NOT EXISTS idx_product_suppliers_preferred ON product_suppliers(
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS purchases (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    supplier_id         INTEGER,                            -- ← migración: opcional (era NOT NULL)
+    supplier_id         INTEGER,
     purchase_number     TEXT UNIQUE NOT NULL,
     invoice_number      TEXT,
     invoice_date        DATE NOT NULL,
@@ -196,12 +195,12 @@ CREATE TABLE IF NOT EXISTS purchases (
     payment_method      TEXT,
     payment_status      TEXT DEFAULT 'pendiente' CHECK(payment_status IN ('pendiente', 'parcial', 'pagado')),
     paid_amount         DECIMAL(10,2) DEFAULT 0,
-    amount_paid         DECIMAL(10,2) DEFAULT 0,            -- ← migración
-    document_type       TEXT,                               -- ← migración
-    has_recoverable_tax INTEGER DEFAULT 0,                  -- ← migración
-    tax_included        INTEGER DEFAULT 1,                  -- ← migración
-    payment_condition   TEXT DEFAULT 'contado',             -- ← migración
-    credit_days         INTEGER DEFAULT 0,                  -- ← migración
+    amount_paid         DECIMAL(10,2) DEFAULT 0,
+    document_type       TEXT,
+    has_recoverable_tax INTEGER DEFAULT 0,
+    tax_included        INTEGER DEFAULT 1,
+    payment_condition   TEXT DEFAULT 'contado',
+    credit_days         INTEGER DEFAULT 0,
     notes               TEXT,
     user_id             INTEGER NOT NULL,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -286,9 +285,9 @@ CREATE TABLE IF NOT EXISTS sales (
     sale_number         TEXT UNIQUE NOT NULL,
     user_id             INTEGER NOT NULL,
     customer_name       TEXT,
-    customer_rut        TEXT,          -- ← migración
-    customer_email      TEXT,          -- ← migración
-    customer_phone      TEXT,          -- ← migración
+    customer_rut        TEXT,
+    customer_email      TEXT,
+    customer_phone      TEXT,
     subtotal            DECIMAL(10,2) NOT NULL,
     discount            DECIMAL(10,2) DEFAULT 0,
     discount_percent    DECIMAL(5,2)  DEFAULT 0,
@@ -300,10 +299,10 @@ CREATE TABLE IF NOT EXISTS sales (
     document_type       TEXT CHECK(document_type IN ('boleta_fisica','boleta_electronica','factura_fisica','factura_electronica','sin_documento')),
     document_number     TEXT,
     notes               TEXT,
-    is_cancelled        BOOLEAN DEFAULT 0,   -- ← migración
-    cancelled_at        DATETIME,            -- ← migración
-    cancelled_by        INTEGER,             -- ← migración
-    cancellation_reason TEXT,                -- ← migración
+    is_cancelled        BOOLEAN DEFAULT 0,
+    cancelled_at        DATETIME,
+    cancelled_by        INTEGER,
+    cancellation_reason TEXT,
     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id)      REFERENCES users(id),
@@ -345,7 +344,7 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id    ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sale_items_product_id ON sale_items(product_id);
 
 -- ============================================================================
--- TABLA: cash_registers  ← migración: nueva tabla
+-- TABLA: cash_registers
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS cash_registers (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -366,7 +365,7 @@ CREATE TABLE IF NOT EXISTS cash_registers (
 CREATE INDEX IF NOT EXISTS idx_cash_registers_status ON cash_registers(status);
 
 -- ============================================================================
--- TABLA: cash_movements  ← migración: nueva tabla
+-- TABLA: cash_movements
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS cash_movements (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -600,6 +599,12 @@ BEGIN
     UPDATE products SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS update_customers_timestamp
+AFTER UPDATE ON customers
+BEGIN
+    UPDATE customers SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS update_users_timestamp
 AFTER UPDATE ON users
 BEGIN
@@ -630,18 +635,18 @@ END;
 -- ============================================================================
 
 INSERT OR IGNORE INTO system_settings (key, value, description, data_type) VALUES
-('app_version',                   '2.0.0',               'Versión de la aplicación',                               'string'),
-('currency_symbol',               '$',                   'Símbolo de moneda',                                      'string'),
-('tax_rate',                      '19',                  'Tasa de impuesto por defecto (%)',                       'number'),
-('low_stock_alert',               '1',                   'Activar alertas de stock bajo',                          'boolean'),
-('auto_backup',                   '1',                   'Backup automático activado',                             'boolean'),
-('backup_frequency',              '7',                   'Frecuencia de backup en días',                           'number'),
-('printer_name',                  '',                    'Nombre de la impresora por defecto',                     'string'),
-('ticket_footer',                 'Gracias por su compra','Mensaje de pie de ticket',                              'string'),
-('kitchen_enabled',               '0',                   'Activar impresión de comanda para cocina',               'boolean'),
-('kitchen_copies',                '1',                   'Cantidad de copias de comanda (1 o 2)',                  'number'),
-('breakeven_alert',               '1',                   'Alertar cuando ventas no cubren gastos fijos',           'boolean'),
-('fixed_expense_percentage_limit','40',                  'Porcentaje máximo recomendado de gastos fijos / ventas', 'number');
+('app_version',                   '2.0.0',                'Versión de la aplicación',                               'string'),
+('currency_symbol',               '$',                    'Símbolo de moneda',                                      'string'),
+('tax_rate',                      '19',                   'Tasa de impuesto por defecto (%)',                       'number'),
+('low_stock_alert',               '1',                    'Activar alertas de stock bajo',                          'boolean'),
+('auto_backup',                   '1',                    'Backup automático activado',                             'boolean'),
+('backup_frequency',              '7',                    'Frecuencia de backup en días',                           'number'),
+('printer_name',                  '',                     'Nombre de la impresora por defecto',                     'string'),
+('ticket_footer',                 'Gracias por su compra','Mensaje de pie de ticket',                               'string'),
+('kitchen_enabled',               '0',                    'Activar impresión de comanda para cocina',               'boolean'),
+('kitchen_copies',                '1',                    'Cantidad de copias de comanda (1 o 2)',                  'number'),
+('breakeven_alert',               '1',                    'Alertar cuando ventas no cubren gastos fijos',           'boolean'),
+('fixed_expense_percentage_limit','40',                   'Porcentaje máximo recomendado de gastos fijos / ventas', 'number');
 
 INSERT OR IGNORE INTO categories (id, name, description, is_active) VALUES
 (1, 'General',          'Categoría general',      1),
