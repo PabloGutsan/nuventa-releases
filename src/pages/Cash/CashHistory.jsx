@@ -23,9 +23,9 @@ const StatusBadge = ({ status }) =>
 
 const DiffBadge = ({ diff }) => {
     if (diff === null || diff === undefined) return <span className="ch-diff ch-diff--na">—</span>;
-    if (diff === 0)  return <span className="ch-diff ch-diff--ok"><FiMinus size={12}/> Exacta</span>;
-    if (diff > 0)    return <span className="ch-diff ch-diff--surplus"><FiTrendingUp size={12}/> +{fmt(diff)}</span>;
-    return                  <span className="ch-diff ch-diff--shortage"><FiTrendingDown size={12}/> {fmt(diff)}</span>;
+    if (diff === 0) return <span className="ch-diff ch-diff--ok"><FiMinus size={12} /> Exacta</span>;
+    if (diff > 0) return <span className="ch-diff ch-diff--surplus"><FiTrendingUp size={12} /> +{fmt(diff)}</span>;
+    return <span className="ch-diff ch-diff--shortage"><FiTrendingDown size={12} /> {fmt(diff)}</span>;
 };
 
 const toSQLiteDate = (dt) => {
@@ -33,21 +33,21 @@ const toSQLiteDate = (dt) => {
     if (!dt.includes('T')) return dt;
     const d = new Date(dt);
     const pad = (n) => String(n).padStart(2, '0');
-    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '
-           +pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' '
+        + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
 };
 
 const getLocalDate = (offsetDays = 0) => {
     const d = new Date();
     d.setDate(d.getDate() + offsetDays);
-    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 };
 
 const getNowSQLite = () => {
     const d = new Date();
     const pad = (n) => String(n).padStart(2, '0');
-    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '
-           +pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' '
+        + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
 };
 
 const PAGE_SIZE = 20;
@@ -70,18 +70,18 @@ const CashRow = ({ reg, onViewDetail }) => (
                 ? <>{fmtDate(reg.closed_at)}<div className="ch-cell-sub">{reg.closed_by_name}</div></>
                 : <span className="ch-cell-sub">En curso</span>}
         </td>
-        <td><StatusBadge status={reg.status}/></td>
+        <td><StatusBadge status={reg.status} /></td>
         <td className="ch-amount ch-amount--sales">{fmt(reg.total_sales)}</td>
         <td className="ch-amount">{fmt(reg.opening_amount)}</td>
         <td className="ch-amount">{reg.expected_cash != null ? fmt(reg.expected_cash) : '—'}</td>
         <td className="ch-amount">{reg.closing_amount != null ? fmt(reg.closing_amount) : '—'}</td>
-        <td><DiffBadge diff={reg.difference}/></td>
+        <td><DiffBadge diff={reg.difference} /></td>
         <td className="ch-duration">
             {fmtDuration(reg.opened_at, reg.closed_at) || (reg.status === 'open' ? '⏱ Activa' : '—')}
         </td>
         <td>
             <button className="ch-btn-eye" onClick={() => onViewDetail(reg)} title="Ver detalle">
-                <FiEye size={15}/>
+                <FiEye size={15} />
             </button>
         </td>
     </tr>
@@ -91,19 +91,19 @@ const CashRow = ({ reg, onViewDetail }) => (
 // COMPONENTE PRINCIPAL
 // =============================================================================
 const CashHistory = () => {
-    const [registers,    setRegisters]    = useState([]);
-    const [loading,      setLoading]      = useState(true);
-    const [exporting,    setExporting]    = useState('');
-    const [selectedReg,  setSelectedReg]  = useState(null);
-    const [stats,        setStats]        = useState({ total: 0, open: 0, avgDiff: 0, totalShortage: 0 });
-    const [searchInput,  setSearchInput]  = useState('');
-    const [searchTerm,   setSearchTerm]   = useState('');
-    const [dateFrom,     setDateFrom]     = useState(getLocalDate(-30));
-    const [dateTo,       setDateTo]       = useState(getLocalDate());
+    const [registers, setRegisters] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState('');
+    const [selectedReg, setSelectedReg] = useState(null);
+    const [stats, setStats] = useState({ total: 0, open: 0, avgDiff: 0, totalShortage: 0 });
+    const [searchInput, setSearchInput] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [dateFrom, setDateFrom] = useState(getLocalDate(-30));
+    const [dateTo, setDateTo] = useState(getLocalDate());
     const [statusFilter, setStatusFilter] = useState('all');
-    const [diffFilter,   setDiffFilter]   = useState('all');
-    const [userFilter,   setUserFilter]   = useState('all');
-    const [currentPage,  setCurrentPage]  = useState(1);
+    const [diffFilter, setDiffFilter] = useState('all');
+    const [userFilter, setUserFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
     const debounceRef = useRef(null);
 
     useEffect(() => { loadHistory(); }, []);
@@ -128,11 +128,11 @@ const CashHistory = () => {
             );
             const data = Array.isArray(rows) ? rows : [];
             setRegisters(data);
-            const closed   = data.filter(r => r.status === 'closed');
-            const open     = data.filter(r => r.status === 'open');
-            const shortage = closed.filter(r => r.difference < 0).reduce((s,r) => s + Math.abs(r.difference), 0);
-            const avgDiff  = closed.length > 0
-                ? closed.reduce((s,r) => s + (r.difference || 0), 0) / closed.length : 0;
+            const closed = data.filter(r => r.status === 'closed');
+            const open = data.filter(r => r.status === 'open');
+            const shortage = closed.filter(r => r.difference < 0).reduce((s, r) => s + Math.abs(r.difference), 0);
+            const avgDiff = closed.length > 0
+                ? closed.reduce((s, r) => s + (r.difference || 0), 0) / closed.length : 0;
             setStats({ total: data.length, open: open.length, avgDiff, totalShortage: shortage });
         } catch (err) {
             console.error('Error cargando historial:', err);
@@ -157,14 +157,14 @@ const CashHistory = () => {
 
     const filtered = useMemo(() => {
         let list = [...registers];
-        if (dateFrom) list = list.filter(r => (r.opened_at || '').slice(0,10) >= dateFrom);
-        if (dateTo)   list = list.filter(r => (r.opened_at || '').slice(0,10) <= dateTo);
+        if (dateFrom) list = list.filter(r => (r.opened_at || '').slice(0, 10) >= dateFrom);
+        if (dateTo) list = list.filter(r => (r.opened_at || '').slice(0, 10) <= dateTo);
         if (statusFilter !== 'all') list = list.filter(r => r.status === statusFilter);
         if (diffFilter !== 'all') {
             list = list.filter(r => {
                 const d = r.difference;
-                if (diffFilter === 'exact')    return d === 0;
-                if (diffFilter === 'surplus')  return d > 0;
+                if (diffFilter === 'exact') return d === 0;
+                if (diffFilter === 'surplus') return d > 0;
                 if (diffFilter === 'shortage') return d < 0;
                 return true;
             });
@@ -178,34 +178,46 @@ const CashHistory = () => {
                 (r.opened_by_name || '').toLowerCase().includes(q) ||
                 (r.closed_by_name || '').toLowerCase().includes(q) ||
                 (r.opened_at || '').toLowerCase().includes(q) ||
-                (r.closed_at  || '').toLowerCase().includes(q)
+                (r.closed_at || '').toLowerCase().includes(q)
             );
         }
         return list;
     }, [registers, dateFrom, dateTo, statusFilter, diffFilter, userFilter, searchTerm]);
 
     const filteredStats = useMemo(() => {
-        const closed   = filtered.filter(r => r.status === 'closed');
-        const open     = filtered.filter(r => r.status === 'open');
-        const shortage = closed.filter(r => r.difference < 0).reduce((s,r) => s + Math.abs(r.difference), 0);
-        const avgDiff  = closed.length > 0
-            ? closed.reduce((s,r) => s + (r.difference || 0), 0) / closed.length : 0;
+        const closed = filtered.filter(r => r.status === 'closed');
+        const open = filtered.filter(r => r.status === 'open');
+        const shortage = closed.filter(r => r.difference < 0).reduce((s, r) => s + Math.abs(r.difference), 0);
+        const avgDiff = closed.length > 0
+            ? closed.reduce((s, r) => s + (r.difference || 0), 0) / closed.length : 0;
         return { total: filtered.length, open: open.length, avgDiff, totalShortage: shortage };
     }, [filtered]);
 
-    const totalPages   = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    const paged        = filtered.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
-    const hasFilters   = !!(searchTerm.trim() || statusFilter !== 'all' || diffFilter !== 'all' || userFilter !== 'all');
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const hasFilters = !!(searchTerm.trim() || statusFilter !== 'all' || diffFilter !== 'all' || userFilter !== 'all');
     const displayStats = hasFilters ? filteredStats : stats;
 
     const handleExportExcel = async () => {
         setExporting('excel');
-        await exportCashHistoryExcel(filtered.length ? filtered : registers);
+        await exportCashHistoryExcel({
+            registers: filtered.length ? filtered : registers,
+            dateFrom,
+            dateTo,
+            statusFilter,
+            userFilter,
+        });
         setExporting('');
     };
     const handleExportPDF = async () => {
         setExporting('pdf');
-        await exportCashHistoryPDF(filtered.length ? filtered : registers);
+        await exportCashHistoryPDF({
+            registers: filtered.length ? filtered : registers,
+            dateFrom,
+            dateTo,
+            statusFilter,
+            userFilter,
+        });
         setExporting('');
     };
     const clearFilters = () => {
@@ -229,16 +241,16 @@ const CashHistory = () => {
                     <div className="ch-header-actions">
                         <button className="ch-btn-excel" onClick={handleExportExcel}
                             disabled={exporting !== '' || registers.length === 0}>
-                            {exporting === 'excel' ? <span className="ch-spinner-sm"/> : <FiDownload size={14}/>}
+                            {exporting === 'excel' ? <span className="ch-spinner-sm" /> : <FiDownload size={14} />}
                             Descargar Excel
                         </button>
                         <button className="ch-btn-pdf" onClick={handleExportPDF}
                             disabled={exporting !== '' || registers.length === 0}>
-                            {exporting === 'pdf' ? <span className="ch-spinner-sm"/> : <FiDownload size={14}/>}
+                            {exporting === 'pdf' ? <span className="ch-spinner-sm" /> : <FiDownload size={14} />}
                             Descargar PDF
                         </button>
                         <button className="ch-btn-refresh" onClick={loadHistory} disabled={loading}>
-                            <FiRefreshCw size={14} className={loading ? 'ch-spin' : ''}/>
+                            <FiRefreshCw size={14} className={loading ? 'ch-spin' : ''} />
                             Actualizar
                         </button>
                     </div>
@@ -248,7 +260,7 @@ const CashHistory = () => {
                 <div className="ch-stats">
                     <div className="ch-stat-card">
                         <div className="ch-stat-icon" style={{ background: '#eff6ff' }}>
-                            <FiCalendar size={20} color="#2563eb"/>
+                            <FiCalendar size={20} color="#2563eb" />
                         </div>
                         <div>
                             <p className="ch-stat-label">Total sesiones</p>
@@ -257,7 +269,7 @@ const CashHistory = () => {
                     </div>
                     <div className="ch-stat-card">
                         <div className="ch-stat-icon" style={{ background: '#ecfdf5' }}>
-                            <FiDollarSign size={20} color="#10b981"/>
+                            <FiDollarSign size={20} color="#10b981" />
                         </div>
                         <div>
                             <p className="ch-stat-label">Cajas abiertas</p>
@@ -267,8 +279,8 @@ const CashHistory = () => {
                     <div className="ch-stat-card">
                         <div className="ch-stat-icon" style={{ background: displayStats.avgDiff >= 0 ? '#ecfdf5' : '#fff1f2' }}>
                             {displayStats.avgDiff >= 0
-                                ? <FiTrendingUp size={20} color="#10b981"/>
-                                : <FiTrendingDown size={20} color="#ef4444"/>}
+                                ? <FiTrendingUp size={20} color="#10b981" />
+                                : <FiTrendingDown size={20} color="#ef4444" />}
                         </div>
                         <div>
                             <p className="ch-stat-label">Diferencia promedio</p>
@@ -279,7 +291,7 @@ const CashHistory = () => {
                     </div>
                     <div className="ch-stat-card">
                         <div className="ch-stat-icon" style={{ background: '#fff1f2' }}>
-                            <FiTrendingDown size={20} color="#ef4444"/>
+                            <FiTrendingDown size={20} color="#ef4444" />
                         </div>
                         <div>
                             <p className="ch-stat-label">Faltantes acumulados</p>
@@ -296,7 +308,7 @@ const CashHistory = () => {
                         <div className="ch-filter-group">
                             <label className="ch-filter-label">Búsqueda</label>
                             <div className="ch-search-wrap">
-                                <FiSearch size={14} className="ch-search-icon"/>
+                                <FiSearch size={14} className="ch-search-icon" />
                                 <input
                                     type="text"
                                     className="ch-search-input"
@@ -309,12 +321,12 @@ const CashHistory = () => {
                         <div className="ch-filter-group">
                             <label className="ch-filter-label">Desde</label>
                             <input type="date" className="ch-filter-select" value={dateFrom}
-                                onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}/>
+                                onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }} />
                         </div>
                         <div className="ch-filter-group">
                             <label className="ch-filter-label">Hasta</label>
                             <input type="date" className="ch-filter-select" value={dateTo}
-                                onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}/>
+                                onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }} />
                         </div>
                         <div className="ch-filter-group">
                             <label className="ch-filter-label">Estado</label>
@@ -349,7 +361,7 @@ const CashHistory = () => {
                             <div className="ch-filter-group ch-filter-group--clear">
                                 <label className="ch-filter-label">&nbsp;</label>
                                 <button className="ch-btn-clear" onClick={clearFilters}>
-                                    <FiX size={13}/> Limpiar
+                                    <FiX size={13} /> Limpiar
                                 </button>
                             </div>
                         )}
@@ -365,19 +377,19 @@ const CashHistory = () => {
                 {/* TABLA */}
                 {loading ? (
                     <div className="ch-loading-state">
-                        <div className="ch-spinner"/>
+                        <div className="ch-spinner" />
                         <p>Cargando historial...</p>
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="ch-empty-state">
-                        <FiDollarSign size={48} color="#d1d5db"/>
+                        <FiDollarSign size={48} color="#d1d5db" />
                         <h3>{registers.length === 0 ? 'Sin registros de caja' : 'Sin resultados'}</h3>
                         <p>{registers.length === 0
                             ? 'Los turnos aparecerán aquí una vez que se realice la primera apertura'
                             : 'Intenta ajustar los filtros de búsqueda'}
                         </p>
                         {registers.length > 0 && (
-                            <button className="ch-btn-clear" onClick={clearFilters} style={{marginTop:12}}>
+                            <button className="ch-btn-clear" onClick={clearFilters} style={{ marginTop: 12 }}>
                                 Limpiar filtros
                             </button>
                         )}
@@ -390,7 +402,7 @@ const CashHistory = () => {
                             <div className="ch-results-bar-left">
                                 {totalPages > 1 && (
                                     <span className="ch-results-page">
-                                        Mostrando {(currentPage-1)*PAGE_SIZE+1}–{Math.min(currentPage*PAGE_SIZE, filtered.length)} de {filtered.length}
+                                        Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} de {filtered.length}
                                     </span>
                                 )}
                             </div>
@@ -416,7 +428,7 @@ const CashHistory = () => {
                             </thead>
                             <tbody>
                                 {paged.map(reg => (
-                                    <CashRow key={reg.id} reg={reg} onViewDetail={setSelectedReg}/>
+                                    <CashRow key={reg.id} reg={reg} onViewDetail={setSelectedReg} />
                                 ))}
                             </tbody>
                         </table>
@@ -429,26 +441,26 @@ const CashHistory = () => {
                                     disabled={currentPage === 1}
                                     title="Primera página">«</button>
                                 <button className="ch-page-btn"
-                                    onClick={() => setCurrentPage(p => Math.max(1,p-1))}
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                     disabled={currentPage === 1}>‹</button>
 
-                                {Array.from({length: totalPages},(_,i)=>i+1)
-                                    .filter(p => p===1 || p===totalPages || Math.abs(p-currentPage)<=2)
-                                    .reduce((acc,p,i,arr) => {
-                                        if (i>0 && p-arr[i-1]>1) acc.push('...');
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                                    .reduce((acc, p, i, arr) => {
+                                        if (i > 0 && p - arr[i - 1] > 1) acc.push('...');
                                         acc.push(p);
                                         return acc;
-                                    },[])
-                                    .map((item,i) => item==='...'
-                                        ? <span key={'e'+i} className="ch-page-ellipsis">…</span>
+                                    }, [])
+                                    .map((item, i) => item === '...'
+                                        ? <span key={'e' + i} className="ch-page-ellipsis">…</span>
                                         : <button key={item}
-                                            className={'ch-page-btn'+(currentPage===item?' active':'')}
+                                            className={'ch-page-btn' + (currentPage === item ? ' active' : '')}
                                             onClick={() => setCurrentPage(item)}>{item}</button>
                                     )
                                 }
 
                                 <button className="ch-page-btn"
-                                    onClick={() => setCurrentPage(p => Math.min(totalPages,p+1))}
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                     disabled={currentPage === totalPages}>›</button>
                                 <button className="ch-page-btn"
                                     onClick={() => setCurrentPage(totalPages)}
@@ -462,7 +474,7 @@ const CashHistory = () => {
             </div>
 
             {selectedReg && (
-                <CashDetailModal reg={selectedReg} onClose={() => setSelectedReg(null)}/>
+                <CashDetailModal reg={selectedReg} onClose={() => setSelectedReg(null)} />
             )}
         </div>
     );

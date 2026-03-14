@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabase } from '../../context/DatabaseContext';
+import { useAuth } from '../../context/AuthContext';
 import UserRepository from '../../services/repositories/userRepository';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
-import { FiX, FiKey, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiX, FiKey, FiEye, FiEyeOff, FiAlertTriangle } from 'react-icons/fi';
 import './PasswordModal.css';
-
-// ── PasswordModal no usa window.alert — notifica al padre via onSave(msg, variant)
 
 const PasswordModal = ({ user, onClose, onSave }) => {
     const { db } = useDatabase();
+    const { currentUser } = useAuth();
     const userRepo = new UserRepository(db);
+
+    const isOwnPassword = currentUser && currentUser.id === user.id;
 
     const [formData, setFormData] = useState({ newPassword: '', confirmPassword: '' });
     const [errors,   setErrors]   = useState({});
@@ -45,13 +47,25 @@ const PasswordModal = ({ user, onClose, onSave }) => {
 
         setLoading(true);
         try {
-            await userRepo.changePassword(user.id, formData.newPassword);
-            // Notifica al padre con mensaje de éxito → el padre muestra el Dialog
-            onSave('✅ Contraseña actualizada exitosamente', 'success');
+            // Cambiar contraseña
+            // - Si es el propio usuario: clearMustChange = true (limpia el flag)
+            // - Si es otro usuario: clearMustChange = false (no toca el flag)
+            await userRepo.changePassword(user.id, formData.newPassword, isOwnPassword);
+
+            // Si el admin cambia la contraseña de otro usuario,
+            // siempre activar must_change_password — sin excepción
+            if (!isOwnPassword) {
+                await userRepo.requirePasswordChange(user.id);
+            }
+
+            const msg = !isOwnPassword
+                ? `✅ Contraseña actualizada. ${user.full_name} deberá cambiarla en su próximo ingreso.`
+                : '✅ Contraseña actualizada exitosamente';
+
+            onSave(msg, 'success');
         } catch (error) {
             console.error('Error changing password:', error);
-            // Notifica al padre con error, keepOpen=true para no cerrar el modal
-            onSave('❌ Error al cambiar la contraseña', 'danger', /* keepOpen */ true);
+            onSave('❌ Error al cambiar la contraseña', 'danger', true);
         } finally {
             setLoading(false);
         }
@@ -71,13 +85,27 @@ const PasswordModal = ({ user, onClose, onSave }) => {
                         <FiKey size={24} />
                         <div>
                             <h2>Cambiar Contraseña</h2>
-                            <p className="modal-subtitle">Usuario: {user.full_name}</p>
+                            <p className="modal-subtitle">
+                                {isOwnPassword ? 'Tu contraseña' : `Usuario: ${user.full_name}`}
+                            </p>
                         </div>
                     </div>
                     <button className="modal-close" onClick={handleClose}><FiX /></button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="password-modal-body">
+
+                    {/* Aviso obligatorio si el admin cambia la contraseña de otro */}
+                    {!isOwnPassword && (
+                        <div className="pm-admin-notice">
+                            <FiAlertTriangle size={15} />
+                            <span>
+                                Estás cambiando la contraseña de <strong>{user.full_name}</strong> (@{user.username}).
+                                Por seguridad, se le pedirá que la cambie en su próximo ingreso.
+                            </span>
+                        </div>
+                    )}
+
                     <Input
                         label="Nueva Contraseña"
                         type={showNew ? 'text' : 'password'}
@@ -102,6 +130,7 @@ const PasswordModal = ({ user, onClose, onSave }) => {
                             </button>
                         }
                     />
+
                     <div className="password-tips">
                         <strong>💡 Consejos para una contraseña segura:</strong>
                         <ul>
