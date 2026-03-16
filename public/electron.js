@@ -14,9 +14,8 @@ const {
 
 let mainWindow;
 let db;
-let pendingUpdate = null; // Guarda la actualización hasta que React esté listo
+let pendingUpdate = null;
 
-// Store para preferencias locales (T&C, etc.)
 const appStore = new Store({ name: 'nuventa-app-prefs' });
 
 // ============================================================================
@@ -71,7 +70,7 @@ function setupAutoUpdater() {
 
     autoUpdater.on('update-downloaded', (info) => {
         console.log('[Updater] Actualización descargada:', info.version);
-        pendingUpdate = null; // Ya descargada, no reenviar el available
+        pendingUpdate = null;
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('update:downloaded', {
                 version:      info.version,
@@ -103,7 +102,6 @@ ipcMain.handle('update:check', async () => {
     }
 });
 
-// Renderer pide el estado actual de la actualización (por si llegó antes de que React montara)
 ipcMain.handle('update:get-pending', () => {
     return pendingUpdate;
 });
@@ -153,26 +151,23 @@ function createWindow() {
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        // Si la actualización ya fue detectada antes de que React cargara, reenviar
         if (pendingUpdate) {
             setTimeout(() => {
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('update:available', pendingUpdate);
                 }
-            }, 3000); // 3s después de mostrar la ventana para que React esté montado
+            }, 3000);
         }
     });
 
     if (isDev) mainWindow.webContents.openDevTools();
 
-    // ── Confirmación al cerrar la app ─────────────────────────────────────
     mainWindow.on('close', async (e) => {
-        if (app.isQuitting) return; // instalando update → dejar pasar
+        if (app.isQuitting) return;
 
-        e.preventDefault(); // frenar el cierre mientras mostramos el dialog
+        e.preventDefault();
 
         try {
-            // Verificar si hay caja abierta
             const openRegister = db
                 ? db.prepare(`SELECT id, opened_at FROM cash_registers WHERE status = 'open' LIMIT 1`).get()
                 : null;
@@ -198,7 +193,6 @@ function createWindow() {
                 app.quit();
             }
         } catch (err) {
-            // Si falla el dialog, cerrar igual
             app.isQuitting = true;
             app.quit();
         }
@@ -235,9 +229,8 @@ function initDatabase() {
 
         if (fs.existsSync(schemaPath)) {
             const schema = fs.readFileSync(schemaPath, 'utf8');
-
             db.exec(schema);
-            console.log('✅ Database schema v2.0 initialized');
+            console.log('✅ Database schema v2.1 initialized');
         } else {
             console.error('❌ schema.sql no encontrado en:', schemaPath);
         }
@@ -480,6 +473,132 @@ ipcMain.handle('window:refocus', () => {
 });
 
 // ============================================================================
+// IPC — GAVETA DE DINERO
+// FIX: este handler faltaba — preload.js expone cashDrawer.open(printerName)
+// invocando 'open-cash-drawer', pero el handler no existía en electron.js.
+// La gaveta se abre enviando el comando ESC/POS kick (ESC p 0 25 250)
+// a la impresora de recibos que tenga conectada la gaveta.
+// ============================================================================
+
+ipcMain.handle('open-cash-drawer', async (event, printerName) => {
+    try {
+        const drawerWin = new BrowserWindow({
+            show: false,
+            width: 1,
+            height: 1,
+            webPreferences: { nodeIntegration: false, contextIsolation: true }
+        });
+
+        // Comando ESC/POS estándar para abrir gaveta (compatible Epson, Star, Bixolon, etc.)
+        // ESC p 0 25 250  →  \x1B\x70\x00\x19\xFA
+        const drawerHTML = `<!DOCTYPE html>
+<html><head><style>
+  @page { size: 1mm 1mm; margin: 0; }
+  body { margin: 0; font-size: 1px; color: white; }
+</style></head>
+<body>\u001Bp\u0000\u0019\u00FA</body></html>`;
+
+        await drawerWin.loadURL(
+            `data:text/html;charset=utf-8,${encodeURIComponent(drawerHTML)}`
+        );
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        const result = await new Promise((resolve) => {
+            drawerWin.webContents.print(
+                {
+                    silent:          true,
+                    printBackground: true,
+                    deviceName:      printerName || '',
+                    margins:         { marginType: 'none' },
+                },
+                (success, reason) => resolve({ success, reason })
+            );
+        });
+
+        drawerWin.destroy();
+        console.log(`[CashDrawer] ${result.success ? 'Abierta OK' : 'Error: ' + result.reason}`);
+        return { success: result.success, error: result.reason };
+    } catch (error) {
+        console.error('[CashDrawer] Error:', error.message);
+        return { success: false, error: error.message };
+    }
+});
+
+// ============================================================================
+// IPC — IMPRESORA DE COCINA
+// ============================================================================
+
+// Listar impresoras del sistema
+// Usado por BusinessSettings.jsx (selector) y cashDrawer
+ipcMain.handle('get-printers', async () => {
+    try {
+        const printers = await mainWindow.webContents.getPrintersAsync();
+        return printers.map(p => ({
+            name:        p.name,
+            description: p.description || p.name,
+            isDefault:   p.isDefault,
+            status:      p.status,
+        }));
+    } catch (error) {
+        console.error('[Printers] Error listando impresoras:', error);
+        return [];
+    }
+});
+
+// Imprimir HTML silenciosamente en impresora específica (sin diálogo del SO)
+// FIX: pageSize.height subido de 297000 (297 mm = A4) a 600000 (600 mm)
+// para que comandas con muchos productos no se corten.
+ipcMain.handle('print-silent', async (event, { html, printerName, copies = 1 }) => {
+    try {
+        const printWin = new BrowserWindow({
+            show: false,
+            width: 400,
+            height: 800,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+            }
+        });
+
+        await printWin.loadURL(
+            `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+        );
+
+        // Esperar a que el renderer pinte el contenido completo
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        const printResult = await new Promise((resolve) => {
+            printWin.webContents.print(
+                {
+                    silent:          true,
+                    printBackground: true,
+                    deviceName:      printerName,
+                    copies:          copies,
+                    margins:         { marginType: 'none' },
+                    // 80 mm de ancho, 600 mm de alto — suficiente para cualquier comanda
+                    pageSize:        { width: 80000, height: 600000 },
+                },
+                (success, reason) => resolve({ success, reason })
+            );
+        });
+
+        printWin.destroy();
+
+        if (printResult.success) {
+            console.log(`[Kitchen] Comanda enviada a "${printerName}" (${copies} copia/s)`);
+            return { success: true };
+        } else {
+            console.error(`[Kitchen] Error imprimiendo en "${printerName}":`, printResult.reason);
+            return { success: false, error: printResult.reason };
+        }
+
+    } catch (error) {
+        console.error('[Kitchen] Error en impresión silenciosa:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// ============================================================================
 // LIFECYCLE
 // ============================================================================
 
@@ -488,7 +607,6 @@ app.whenReady().then(() => {
         setupAutoUpdater();
         createWindow();
 
-        // Verificar actualizaciones 15s después de abrir (asegura que React ya está montado)
         if (!isDev) {
             setTimeout(() => {
                 autoUpdater.checkForUpdates().catch(err => {
@@ -497,7 +615,6 @@ app.whenReady().then(() => {
             }, 15000);
         }
 
-        // Verificar licencia periodicamente cada 60 minutos
         setInterval(async () => {
             try {
                 console.log("[License] Verificacion periodica...");

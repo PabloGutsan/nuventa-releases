@@ -338,3 +338,54 @@
     .sdm-sale-btn-print span,
     .sdm-sale-btn-cancel span { display: none; }
 }
+
+/* ── Agregar al final de SaleDetailModal.css ─────────────────────────────────
+   Banner que muestra mesa y observaciones de cocina guardadas en la venta.
+   Aparece solo cuando la venta tiene table_info o kitchen_notes.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.sdm-sale-kitchen-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #fefce8;
+    border: 1px solid #fde047;
+    border-radius: 10px;
+    margin-bottom: 4px;
+}
+
+.sdm-sale-kitchen-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.sdm-sale-kitchen-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+.sdm-sale-kitchen-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sdm-sale-kitchen-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #92400e;
+    white-space: nowrap;
+    font-family: 'Poppins', sans-serif;
+}
+
+.sdm-sale-kitchen-value {
+    font-size: 13px;
+    color: #78350f;
+    font-family: 'Poppins', sans-serif;
+    line-height: 1.5;
+}

@@ -46,7 +46,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         check: () => ipcRenderer.invoke('license:check'),
         activate: (licenseKey, email, businessName) => ipcRenderer.invoke('license:activate', licenseKey, email, businessName),
         clear: () => ipcRenderer.invoke('license:clear'),
-        // Escucha revocación en tiempo real (verificación periódica cada 60min)
         onRevoked: (callback) => {
             const handler = (_, data) => callback(data);
             ipcRenderer.on('license:revoked', handler);
@@ -80,8 +79,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         },
 
         installNow: () => ipcRenderer.invoke('update:install-now'),
-
-        // Compatibilidad con versión anterior del UpdateBanner
         openExternal: (url) => ipcRenderer.invoke('app:openExternal', url)
     },
 
@@ -99,7 +96,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cashDrawer: {
         open: (printerName) => ipcRenderer.invoke('open-cash-drawer', printerName),
         getPrinters: () => ipcRenderer.invoke('get-printers')
-    }
+    },
+
+    // ── Impresora de cocina ← NUEVO ───────────────────────────────────────────
+    kitchen: {
+        // Lista las impresoras instaladas en el sistema
+        getPrinters: () => ipcRenderer.invoke('get-printers'),
+
+        // Imprime el HTML de la comanda silenciosamente en la impresora configurada
+        // html: string HTML, printerName: nombre de la impresora, copies: número de copias
+        printSilent: (html, printerName, copies) =>
+            ipcRenderer.invoke('print-silent', { html, printerName, copies }),
+    },
 
 });
 

@@ -214,3 +214,24 @@
     font-family: 'Poppins', sans-serif;
     pointer-events: none;
 }
+
+.pm-auto-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #eff6ff;
+    border-bottom: 1px solid #dbeafe;
+    font-size: 13px;
+    color: #1e40af;
+}
+
+.pm-spinner-sm {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #4f46e5;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+}

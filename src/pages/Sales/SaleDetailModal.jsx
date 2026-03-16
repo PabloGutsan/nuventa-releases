@@ -13,7 +13,7 @@ import './SaleDetailModal.css';
 const SaleDetailModal = ({ sale, onClose, onCancel, isAdmin = false }) => {
     const { db } = useDatabase();
     const [showPrintModal, setShowPrintModal] = useState(false);
-    const [businessInfo, setBusinessInfo]     = useState(null);
+    const [businessInfo,   setBusinessInfo]   = useState(null);
 
     const businessRepo = new BusinessRepository(db);
 
@@ -23,8 +23,17 @@ const SaleDetailModal = ({ sale, onClose, onCancel, isAdmin = false }) => {
     }, []);
 
     useEffect(() => {
-        const info = businessRepo.getBusinessInfo();
-        setBusinessInfo(info);
+        // FIX: getBusinessInfo es async — faltaba el await, haciendo que
+        // businessInfo llegara siempre undefined al PrintModal.
+        const loadBusiness = async () => {
+            try {
+                const info = await businessRepo.getBusinessInfo();
+                setBusinessInfo(info);
+            } catch (err) {
+                console.warn('SaleDetailModal: error cargando businessInfo:', err.message);
+            }
+        };
+        loadBusiness();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
@@ -55,11 +64,14 @@ const SaleDetailModal = ({ sale, onClose, onCancel, isAdmin = false }) => {
         sin_documento:       'Sin Documento',
     }[t] || t);
 
-    const handleClose = () => { document.body.style.overflow = ''; onClose(); };
-    const handleOpenPrint = () => setShowPrintModal(true);
+    const handleClose      = () => { document.body.style.overflow = ''; onClose(); };
+    const handleOpenPrint  = () => setShowPrintModal(true);
     const handleClosePrint = () => { setShowPrintModal(false); document.body.style.overflow = 'hidden'; };
 
     const itemsCount = Array.isArray(sale.items) ? sale.items.length : 0;
+
+    // Si la venta tiene info de comanda mostramos la card
+    const hasKitchenInfo = sale.table_info || sale.kitchen_notes;
 
     return (
         <div className="sdm-sale-overlay" onClick={handleClose}>
@@ -116,7 +128,28 @@ const SaleDetailModal = ({ sale, onClose, onCancel, isAdmin = false }) => {
                         </div>
                     )}
 
-                    {/* ── Grid 3 columnas: Fecha/Vendedor | Pago | Cliente ── */}
+                    {/* ── Info de comanda (mesa + observaciones) ── */}
+                    {hasKitchenInfo && (
+                        <div className="sdm-sale-kitchen-banner">
+                            <span className="sdm-sale-kitchen-icon">🍽️</span>
+                            <div className="sdm-sale-kitchen-content">
+                                {sale.table_info && (
+                                    <div className="sdm-sale-kitchen-row">
+                                        <span className="sdm-sale-kitchen-label">🪑 Mesa / Cliente:</span>
+                                        <span className="sdm-sale-kitchen-value">{sale.table_info}</span>
+                                    </div>
+                                )}
+                                {sale.kitchen_notes && (
+                                    <div className="sdm-sale-kitchen-row">
+                                        <span className="sdm-sale-kitchen-label">⚠️ Observaciones:</span>
+                                        <span className="sdm-sale-kitchen-value">{sale.kitchen_notes}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Grid 3 columnas: Info general | Pago | Cliente ── */}
                     <div className="sdm-sale-info-grid">
 
                         {/* Información general */}

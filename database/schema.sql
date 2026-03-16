@@ -1,6 +1,6 @@
 -- ============================================================================
 -- NUVENTA - ESQUEMA DE BASE DE DATOS
--- SQLite — Versión 2.0 consolidada
+-- SQLite — Versión 2.1 consolidada
 -- ============================================================================
 
 -- ============================================================================
@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS business_info (
     tax_id          TEXT,
     legal_name      TEXT,
     footer_message  TEXT DEFAULT 'Gracias por su compra',
+    region          TEXT,
+    city            TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -299,6 +301,8 @@ CREATE TABLE IF NOT EXISTS sales (
     document_type       TEXT CHECK(document_type IN ('boleta_fisica','boleta_electronica','factura_fisica','factura_electronica','sin_documento')),
     document_number     TEXT,
     notes               TEXT,
+    table_info          TEXT,
+    kitchen_notes       TEXT,
     is_cancelled        BOOLEAN DEFAULT 0,
     cancelled_at        DATETIME,
     cancelled_by        INTEGER,
@@ -635,7 +639,7 @@ END;
 -- ============================================================================
 
 INSERT OR IGNORE INTO system_settings (key, value, description, data_type) VALUES
-('app_version',                   '2.0.0',                'Versión de la aplicación',                               'string'),
+('app_version',                   '2.1.0',                'Versión de la aplicación',                               'string'),
 ('currency_symbol',               '$',                    'Símbolo de moneda',                                      'string'),
 ('tax_rate',                      '19',                   'Tasa de impuesto por defecto (%)',                       'number'),
 ('low_stock_alert',               '1',                    'Activar alertas de stock bajo',                          'boolean'),
@@ -643,8 +647,13 @@ INSERT OR IGNORE INTO system_settings (key, value, description, data_type) VALUE
 ('backup_frequency',              '7',                    'Frecuencia de backup en días',                           'number'),
 ('printer_name',                  '',                     'Nombre de la impresora por defecto',                     'string'),
 ('ticket_footer',                 'Gracias por su compra','Mensaje de pie de ticket',                               'string'),
+('ticket_printer',                '',                     'Impresora de tickets (silenciosa)',                      'string'),
 ('kitchen_enabled',               '0',                    'Activar impresión de comanda para cocina',               'boolean'),
 ('kitchen_copies',                '1',                    'Cantidad de copias de comanda (1 o 2)',                  'number'),
+('kitchen_printer',               '',                     'Impresora de cocina',                                    'string'),
+('kitchen_copy_dest',             'kitchen',              'Destino de copias de comanda',                           'string'),
+('cash_limit_alert',              '350000',               'Límite de alerta de efectivo en caja',                   'number'),
+('cash_withdrawal_amount',        '300000',               'Monto sugerido de retiro de caja',                       'number'),
 ('breakeven_alert',               '1',                    'Alertar cuando ventas no cubren gastos fijos',           'boolean'),
 ('fixed_expense_percentage_limit','40',                   'Porcentaje máximo recomendado de gastos fijos / ventas', 'number');
 
@@ -656,5 +665,5 @@ INSERT OR IGNORE INTO categories (id, name, description, is_active) VALUES
 (5, 'Higiene Personal', 'Productos de higiene',   1);
 
 -- ============================================================================
--- FIN DEL ESQUEMA v2.0
+-- FIN DEL ESQUEMA v2.1
 -- ============================================================================

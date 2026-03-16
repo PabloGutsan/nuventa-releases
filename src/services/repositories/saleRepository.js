@@ -38,7 +38,7 @@ class SaleRepository {
             }
             return saleNumber;
         } catch (error) {
-            console.error('❌ Error generating sale number:', error);
+            console.error('Error generating sale number:', error);
             return `V-${Date.now()}`;
         }
     }
@@ -164,9 +164,10 @@ class SaleRepository {
 
                     if (!prodUnlimited) {
                         const previousStock = parseFloat(prodData.stock) || 0;
-                        await window.electronAPI.database.run(`
-                            UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?
-                        `, [itemQuantity, localTimestamp, item.product_id]);
+                        await window.electronAPI.database.run(
+                            'UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?',
+                            [itemQuantity, localTimestamp, item.product_id]
+                        );
 
                         await window.electronAPI.database.run(`
                             INSERT INTO inventory_movements (
@@ -191,8 +192,33 @@ class SaleRepository {
                 timestamp: localTimestamp
             };
         } catch (error) {
-            console.error('❌ Error creating sale:', error);
+            console.error('Error creating sale:', error);
             throw error;
+        }
+    }
+
+    // ============================================================================
+    // Guardar mesa y notas de cocina en una venta existente
+    // Se llama desde PrintModal al momento de imprimir, porque esos campos
+    // se rellenan DESPUÉS de que la venta ya fue creada en la BD.
+    // No es crítico: si falla el UPDATE, la impresión igual procede.
+    // ============================================================================
+    async updateKitchenInfo(saleId, tableInfo, kitchenNotes) {
+        try {
+            if (!saleId) return;
+            const hasData = (tableInfo && tableInfo.trim()) || (kitchenNotes && kitchenNotes.trim());
+            if (!hasData) return; // no actualizar si ambos están vacíos
+            await window.electronAPI.database.run(
+                `UPDATE sales SET table_info = ?, kitchen_notes = ?, updated_at = ? WHERE id = ?`,
+                [
+                    tableInfo    ? tableInfo.trim()    : null,
+                    kitchenNotes ? kitchenNotes.trim() : null,
+                    this.getLocalTimestamp(),
+                    saleId
+                ]
+            );
+        } catch (error) {
+            console.warn('⚠️ No se pudieron guardar mesa/notas en la venta:', error.message);
         }
     }
 
@@ -214,7 +240,7 @@ class SaleRepository {
 
             return { ...sales[0], items: Array.isArray(items) ? items : [] };
         } catch (error) {
-            console.error('❌ Error getting sale by ID:', error);
+            console.error('Error getting sale by ID:', error);
             return null;
         }
     }
@@ -234,7 +260,7 @@ class SaleRepository {
             );
             return { ...sales[0], items: Array.isArray(items) ? items : [] };
         } catch (error) {
-            console.error('❌ Error getting sale by number:', error);
+            console.error('Error getting sale by number:', error);
             return null;
         }
     }
@@ -252,7 +278,7 @@ class SaleRepository {
             `);
             return Array.isArray(sales) ? sales : [];
         } catch (error) {
-            console.error('❌ Error getting all sales:', error);
+            console.error('Error getting all sales:', error);
             return [];
         }
     }
@@ -271,14 +297,10 @@ class SaleRepository {
             `, [todayDate]);
             return Array.isArray(sales) ? sales : [];
         } catch (error) {
-            console.error('❌ Error getting today sales:', error);
+            console.error('Error getting today sales:', error);
             return [];
         }
     }
-
-    // ============================================================================
-    // ACTIONS: Cancelar venta
-    // ============================================================================
 
     async cancelSale(id, userId, reason) {
         try {
@@ -286,14 +308,12 @@ class SaleRepository {
             if (!userId) throw new Error('ID de usuario es obligatorio');
             if (!reason || !reason.trim()) throw new Error('La razón de cancelación es obligatoria');
 
-            console.log('🚫 Cancelando venta ID:', id);
             const sale = await this.getSaleById(id);
             if (!sale) throw new Error('Venta no encontrada');
             if (sale.is_cancelled) throw new Error('La venta ya está cancelada');
 
             const localTimestamp = this.getLocalTimestamp();
 
-            // ── Devolver stock ─────────────────────────────────────────────────
             const items = await window.electronAPI.database.query(`
                 SELECT si.*, p.allow_negative_stock, p.unlimited_stock
                 FROM sale_items si
@@ -333,7 +353,6 @@ class SaleRepository {
                 }
             }
 
-            // ── Marcar venta como cancelada ────────────────────────────────────
             await window.electronAPI.database.run(`
                 UPDATE sales
                 SET is_cancelled = 1, cancelled_at = ?, cancelled_by = ?,
@@ -341,16 +360,11 @@ class SaleRepository {
                 WHERE id = ?
             `, [localTimestamp, userId, reason.trim(), localTimestamp, id]);
 
-            // ── FIX: Registrar egreso en caja si el pago fue en efectivo ───────
-            // Al cancelar, la venta sale del cálculo de cashSales (is_cancelled=0).
-            // Sin este egreso, el expectedCash quedaría menor que el efectivo físico
-            // porque el dinero ya entró a caja pero no hay registro de que salió.
             const needsCashMovement =
                 sale.payment_method === 'efectivo' ||
                 sale.payment_method === 'multiple';
 
             if (needsCashMovement) {
-                // Buscar caja abierta del usuario que vendió (sale.user_id)
                 const openRegister = await window.electronAPI.database.get(`
                     SELECT id FROM cash_registers
                     WHERE status = 'open' AND opened_by = ?
@@ -358,8 +372,6 @@ class SaleRepository {
                 `, [sale.user_id]);
 
                 if (openRegister) {
-                    // Para pagos múltiples usar cash_received si está disponible,
-                    // de lo contrario usar el total completo de la venta
                     const cashAmount = sale.payment_method === 'multiple'
                         ? (sale.cash_received || sale.total)
                         : sale.total;
@@ -368,30 +380,20 @@ class SaleRepository {
                         INSERT INTO cash_movements (register_id, user_id, type, amount, reason, created_at)
                         VALUES (?, ?, 'out', ?, ?, ?)
                     `, [
-                        openRegister.id,
-                        userId,
+                        openRegister.id, userId,
                         Math.round(cashAmount),
                         `Devolución - ${sale.sale_number}`,
                         localTimestamp
                     ]);
-
-                    console.log(`💵 Egreso de caja registrado por cancelación: $${Math.round(cashAmount)}`);
-                } else {
-                    console.warn('⚠️ No hay caja abierta para registrar egreso por cancelación');
                 }
             }
 
-            console.log('✅ Venta cancelada exitosamente');
             return { success: true };
         } catch (error) {
-            console.error('❌ Error cancelling sale:', error);
+            console.error('Error cancelling sale:', error);
             throw error;
         }
     }
-
-    // ============================================================================
-    // STATS
-    // ============================================================================
 
     async getTodayStats() {
         try {
@@ -410,15 +412,15 @@ class SaleRepository {
                 return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
             }
             return {
-                total_sales: parseInt(stats[0].total_sales) || 0,
-                total_revenue: parseFloat(stats[0].total_revenue) || 0,
+                total_sales:    parseInt(stats[0].total_sales)    || 0,
+                total_revenue:  parseFloat(stats[0].total_revenue)  || 0,
                 average_ticket: parseFloat(stats[0].average_ticket) || 0,
                 total_subtotal: parseFloat(stats[0].total_subtotal) || 0,
                 total_discount: parseFloat(stats[0].total_discount) || 0,
-                total_tax: parseFloat(stats[0].total_tax) || 0
+                total_tax:      parseFloat(stats[0].total_tax)      || 0,
             };
         } catch (error) {
-            console.error('❌ Error getting today stats:', error);
+            console.error('Error getting today stats:', error);
             return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
         }
     }
@@ -439,20 +441,20 @@ class SaleRepository {
                 WHERE DATE(created_at) >= DATE(?) AND DATE(created_at) <= DATE(?)
             `, [dateFrom, dateTo]);
             if (!Array.isArray(results) || results.length === 0) {
-                return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
+                return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0 };
             }
             return {
-                total_sales: parseInt(results[0].total_sales) || 0,
-                total_revenue: parseFloat(results[0].total_revenue) || 0,
-                average_ticket: parseFloat(results[0].average_ticket) || 0,
-                cancelled_sales: parseInt(results[0].cancelled_sales) || 0,
+                total_sales:       parseInt(results[0].total_sales)       || 0,
+                total_revenue:     parseFloat(results[0].total_revenue)     || 0,
+                average_ticket:    parseFloat(results[0].average_ticket)    || 0,
+                cancelled_sales:   parseInt(results[0].cancelled_sales)     || 0,
                 cancelled_revenue: parseFloat(results[0].cancelled_revenue) || 0,
-                total_subtotal: parseFloat(results[0].total_subtotal) || 0,
-                total_discount: parseFloat(results[0].total_discount) || 0,
-                total_tax: parseFloat(results[0].total_tax) || 0
+                total_subtotal:    parseFloat(results[0].total_subtotal)    || 0,
+                total_discount:    parseFloat(results[0].total_discount)    || 0,
+                total_tax:         parseFloat(results[0].total_tax)         || 0,
             };
         } catch (error) {
-            console.error('❌ Error getting period stats:', error);
+            console.error('Error getting period stats:', error);
             return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0 };
         }
     }
@@ -473,13 +475,13 @@ class SaleRepository {
                 return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0 };
             }
             return {
-                total_sales: parseInt(result[0].total_sales) || 0,
-                total_revenue: parseFloat(result[0].total_revenue) || 0,
-                average_ticket: parseFloat(result[0].average_ticket) || 0,
-                cancelled_sales: parseInt(result[0].cancelled_sales) || 0,
+                total_sales:     parseInt(result[0].total_sales)     || 0,
+                total_revenue:   parseFloat(result[0].total_revenue)   || 0,
+                average_ticket:  parseFloat(result[0].average_ticket)  || 0,
+                cancelled_sales: parseInt(result[0].cancelled_sales)   || 0,
             };
         } catch (error) {
-            console.error('❌ Error getting user day stats:', error);
+            console.error('Error getting user day stats:', error);
             return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0 };
         }
     }
@@ -501,9 +503,9 @@ class SaleRepository {
                 const searchTerm = `%${filters.search.trim()}%`;
                 params.push(searchTerm, searchTerm, searchTerm, searchTerm);
             }
-            if (filters.dateFrom) { sql += ` AND DATE(s.created_at) >= DATE(?)`; params.push(filters.dateFrom); }
-            if (filters.dateTo)   { sql += ` AND DATE(s.created_at) <= DATE(?)`; params.push(filters.dateTo); }
-            if (filters.userId)   { sql += ` AND s.user_id = ?`; params.push(filters.userId); }
+            if (filters.dateFrom)      { sql += ` AND DATE(s.created_at) >= DATE(?)`; params.push(filters.dateFrom); }
+            if (filters.dateTo)        { sql += ` AND DATE(s.created_at) <= DATE(?)`; params.push(filters.dateTo); }
+            if (filters.userId)        { sql += ` AND s.user_id = ?`; params.push(filters.userId); }
             if (filters.paymentMethod && filters.paymentMethod.trim()) {
                 sql += ` AND s.payment_method = ?`; params.push(filters.paymentMethod.trim());
             }
@@ -527,7 +529,7 @@ class SaleRepository {
             const sales = await window.electronAPI.database.query(sql, params);
             return Array.isArray(sales) ? sales : [];
         } catch (error) {
-            console.error('❌ Error getting filtered sales:', error);
+            console.error('Error getting filtered sales:', error);
             return [];
         }
     }
@@ -545,7 +547,7 @@ class SaleRepository {
             `, [dateFrom, dateTo]);
             return Array.isArray(paymentMethods) ? paymentMethods : [];
         } catch (error) {
-            console.error('❌ Error getting sales by payment method:', error);
+            console.error('Error getting sales by payment method:', error);
             return [];
         }
     }
@@ -569,7 +571,7 @@ class SaleRepository {
             `, [dateFrom, dateTo, parseInt(limit) || 10]);
             return Array.isArray(products) ? products : [];
         } catch (error) {
-            console.error('❌ Error getting top selling products:', error);
+            console.error('Error getting top selling products:', error);
             return [];
         }
     }
@@ -591,7 +593,7 @@ class SaleRepository {
             `, [dateFrom, dateTo]);
             return Array.isArray(sellers) ? sellers : [];
         } catch (error) {
-            console.error('❌ Error getting sales by seller:', error);
+            console.error('Error getting sales by seller:', error);
             return [];
         }
     }
@@ -611,7 +613,7 @@ class SaleRepository {
             `);
             return Array.isArray(comparison) ? comparison : [];
         } catch (error) {
-            console.error('❌ Error getting monthly comparison:', error);
+            console.error('Error getting monthly comparison:', error);
             return [];
         }
     }

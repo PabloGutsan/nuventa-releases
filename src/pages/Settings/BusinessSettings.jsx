@@ -2,37 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDatabase } from '../../context/DatabaseContext';
 import BusinessRepository from '../../services/repositories/businessRepository';
 import Card from '../../components/common/Card';
-import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import SearchableSelect from '../../components/common/SearchableSelect';
-import { FiSave, FiUpload, FiX } from 'react-icons/fi';
+import { FiSave, FiUpload, FiX, FiRefreshCw } from 'react-icons/fi';
 import { REGIONES, getComunasByRegion } from '../../data/regionesComunas';
 import './BusinessSettings.css';
-
-// ── Dialog React ──────────────────────────────────────────────────────────────
-const DIALOG_ICONS = { danger: '⚠️', success: '✅', warning: '⚠️', primary: 'ℹ️' };
-
-const Dialog = ({ message, confirmLabel, confirmVariant = 'primary', onConfirm, onCancel, children }) => (
-    <div className="bs-dialog-overlay" onClick={onCancel || undefined}>
-        <div className="bs-dialog" onClick={e => e.stopPropagation()}>
-            <div className="bs-dialog-icon">{DIALOG_ICONS[confirmVariant] || 'ℹ️'}</div>
-            {message && <p className="bs-dialog-message">{message}</p>}
-            {children}
-            {!children && (
-                <div className="bs-dialog-actions">
-                    {onCancel && (
-                        <button className="bs-dialog-btn bs-dialog-btn--cancel" onClick={onCancel}>
-                            Cancelar
-                        </button>
-                    )}
-                    <button className={`bs-dialog-btn bs-dialog-btn--${confirmVariant}`} onClick={onConfirm}>
-                        {confirmLabel}
-                    </button>
-                </div>
-            )}
-        </div>
-    </div>
-);
 
 // ── Validación de URL/sitio web ───────────────────────────────────────────────
 const WEBSITE_REGEX = /^(https?:\/\/)?([\w-]+\.)+[\w]{2,}(\/\S*)?$/i;
@@ -125,14 +99,23 @@ const BusinessSettings = ({ onNavigate }) => {
     const [errorMsg,       setErrorMsg]       = useState('');
     const [fieldErrors,    setFieldErrors]    = useState({});
 
+    // ── Configuración de impresora de tickets ────────────────────────────────
+    // Si está configurada, el ticket se imprime silenciosamente sin diálogo del SO.
+    const [ticketPrinter,  setTicketPrinter]  = useState('');
+    const [savedTicket,    setSavedTicket]    = useState(null);
+
     // ── Configuración de cocina ───────────────────────────────────────────────
-    const [kitchenEnabled, setKitchenEnabled] = useState(false);
-    const [kitchenCopies,  setKitchenCopies]  = useState(1);
+    // kitchenCopyDest valores posibles:
+    //   1 copia:  'kitchen' (→ impresora cocina) | 'cajero' (→ junto con ticket)
+    //   2 copias: 'both_kitchen' (→ 2 a cocina)  | 'split' (→ 1 cocina + 1 cajero) | 'both_cajero' (→ 2 al cajero)
+    const [kitchenEnabled,    setKitchenEnabled]    = useState(false);
+    const [kitchenCopies,     setKitchenCopies]     = useState(1);
+    const [kitchenPrinter,    setKitchenPrinter]    = useState('');
+    const [kitchenCopyDest,   setKitchenCopyDest]   = useState('kitchen');
+    const [availablePrinters, setAvailablePrinters] = useState([]);
 
     // ── Configuración de caja ─────────────────────────────────────────────────
-    // cashLimitAlert:      monto máximo en caja antes de avisar (default $350.000)
-    // cashWithdrawalAmount: monto sugerido de retiro              (default $300.000)
-    const [cashLimitAlert,      setCashLimitAlert]      = useState('350.000');
+    const [cashLimitAlert,       setCashLimitAlert]       = useState('350.000');
     const [cashWithdrawalAmount, setCashWithdrawalAmount] = useState('300.000');
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
@@ -140,15 +123,19 @@ const BusinessSettings = ({ onNavigate }) => {
 
     // ── Detectar cambios sin guardar ──────────────────────────────────────────
     const hasUnsavedChanges = useCallback(() => {
-        if (!savedData || !savedKitchen || !savedCash) return false;
+        if (!savedData || !savedKitchen || !savedCash || !savedTicket) return false;
         const formChanged    = JSON.stringify(formData) !== JSON.stringify(savedData);
-        const kitchenChanged = kitchenEnabled !== savedKitchen.enabled
-                            || kitchenCopies  !== savedKitchen.copies;
+        const ticketChanged  = ticketPrinter !== savedTicket.printer;
+        const kitchenChanged = kitchenEnabled  !== savedKitchen.enabled
+                            || kitchenCopies   !== savedKitchen.copies
+                            || kitchenPrinter  !== savedKitchen.printer
+                            || kitchenCopyDest !== savedKitchen.copyDest;
         const cashChanged    = parseCLP(cashLimitAlert)       !== savedCash.limit
                             || parseCLP(cashWithdrawalAmount) !== savedCash.withdrawal;
-        return formChanged || kitchenChanged || cashChanged;
-    }, [formData, savedData, kitchenEnabled, kitchenCopies, savedKitchen,
-        cashLimitAlert, cashWithdrawalAmount, savedCash]);
+        return formChanged || ticketChanged || kitchenChanged || cashChanged;
+    }, [formData, savedData, ticketPrinter, savedTicket,
+        kitchenEnabled, kitchenCopies, kitchenPrinter, kitchenCopyDest,
+        savedKitchen, cashLimitAlert, cashWithdrawalAmount, savedCash]);
 
     // ── Interceptor de navegación ─────────────────────────────────────────────
     useEffect(() => {
@@ -163,14 +150,14 @@ const BusinessSettings = ({ onNavigate }) => {
     }, [hasUnsavedChanges, onNavigate]);
 
     // ── Carga inicial ─────────────────────────────────────────────────────────
-    useEffect(() => { loadBusinessInfo(); }, []);
+    useEffect(() => { loadBusinessInfo(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const list = getComunasByRegion(formData.region);
         setComunas(list);
         if (formData.city && list.length > 0 && !list.includes(formData.city))
             setFormData(prev => ({ ...prev, city: '' }));
-    }, [formData.region]);
+    }, [formData.region]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const onKey = (e) => { if (e.key === 'Escape' && dialog) setDialog(null); };
@@ -178,13 +165,20 @@ const BusinessSettings = ({ onNavigate }) => {
         return () => window.removeEventListener('keydown', onKey);
     }, [dialog]);
 
+    // ── Cargar lista de impresoras ────────────────────────────────────────────
+    const loadPrinters = async () => {
+        try {
+            const printers = await window.electronAPI.kitchen.getPrinters();
+            setAvailablePrinters(printers || []);
+        } catch {
+            setAvailablePrinters([]);
+        }
+    };
+
     const loadBusinessInfo = async () => {
         try {
             setInitialLoading(true);
-            try { await window.electronAPI.database.run(`ALTER TABLE business_info ADD COLUMN region TEXT`); } catch {}
-            try { await window.electronAPI.database.run(`ALTER TABLE business_info ADD COLUMN city TEXT`);   } catch {}
 
-            // Asegurar que existan las claves de configuración de caja
             await window.electronAPI.database.run(
                 `INSERT OR IGNORE INTO system_settings (key, value, description, data_type)
                  VALUES ('cash_limit_alert', '350000', 'Límite de alerta de efectivo en caja', 'number')`
@@ -216,26 +210,36 @@ const BusinessSettings = ({ onNavigate }) => {
             setFormData(loaded);
             setSavedData({ ...loaded });
 
+            // Impresora de tickets
+            const ticketPrinterResult = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'ticket_printer'`);
+            const tp = ticketPrinterResult?.value || '';
+            setTicketPrinter(tp);
+            setSavedTicket({ printer: tp });
+
             // Cocina
-            const kitchenResult = await window.electronAPI.database.get(
-                `SELECT value FROM system_settings WHERE key = 'kitchen_enabled'`
-            );
-            const copiesResult = await window.electronAPI.database.get(
-                `SELECT value FROM system_settings WHERE key = 'kitchen_copies'`
-            );
+            const kitchenResult  = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_enabled'`);
+            const copiesResult   = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_copies'`);
+            const printerResult  = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_printer'`);
+            const copyDestResult = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_copy_dest'`);
+
             const ke = kitchenResult?.value === '1';
             const kc = parseInt(copiesResult?.value || '1');
+            const kp = printerResult?.value || '';
+            // Normalizar el valor guardado: si viene 'both_kitchen' con kc=1, usar 'kitchen'
+            const rawDest = copyDestResult?.value || '';
+            const kd = rawDest || (kc === 1 ? 'kitchen' : 'both_kitchen');
+
             setKitchenEnabled(ke);
             setKitchenCopies(kc);
-            setSavedKitchen({ enabled: ke, copies: kc });
+            setKitchenPrinter(kp);
+            setKitchenCopyDest(kd);
+            setSavedKitchen({ enabled: ke, copies: kc, printer: kp, copyDest: kd });
+
+            await loadPrinters();
 
             // Caja
-            const limitResult      = await window.electronAPI.database.get(
-                `SELECT value FROM system_settings WHERE key = 'cash_limit_alert'`
-            );
-            const withdrawalResult = await window.electronAPI.database.get(
-                `SELECT value FROM system_settings WHERE key = 'cash_withdrawal_amount'`
-            );
+            const limitResult      = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'cash_limit_alert'`);
+            const withdrawalResult = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'cash_withdrawal_amount'`);
             const cl = parseInt(limitResult?.value      || '350000');
             const cw = parseInt(withdrawalResult?.value || '300000');
             setCashLimitAlert(cl.toLocaleString('es-CL'));
@@ -253,6 +257,13 @@ const BusinessSettings = ({ onNavigate }) => {
     // ── Helpers errores ───────────────────────────────────────────────────────
     const setFieldError   = (field, msg) => setFieldErrors(prev => ({ ...prev, [field]: msg }));
     const clearFieldError = (field)      => setFieldErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+
+    // ── Handler cambio de copias — resetea copyDest al default del modo ───────
+    const handleSetCopies = (n) => {
+        setKitchenCopies(n);
+        // Reset al default de cada modo para evitar estados inválidos
+        setKitchenCopyDest(n === 1 ? 'kitchen' : 'both_kitchen');
+    };
 
     // ── Handlers formulario ───────────────────────────────────────────────────
     const handleChange = (e) => {
@@ -302,7 +313,6 @@ const BusinessSettings = ({ onNavigate }) => {
         if (errorMsg) setErrorMsg('');
     };
 
-    // ── Handlers campos de caja (formato CLP con puntos) ──────────────────────
     const handleCashLimitChange = (e) => {
         setCashLimitAlert(formatCLP(e.target.value));
         if (errorMsg) setErrorMsg('');
@@ -382,6 +392,13 @@ const BusinessSettings = ({ onNavigate }) => {
                 city:           formData.city   || null,
             });
 
+            // Impresora de tickets
+            await window.electronAPI.database.run(
+                `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
+                 VALUES ('ticket_printer', ?, 'Impresora de tickets (silenciosa)', 'string')`,
+                [ticketPrinter]
+            );
+
             // Cocina
             await window.electronAPI.database.run(
                 `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
@@ -392,6 +409,16 @@ const BusinessSettings = ({ onNavigate }) => {
                 `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
                  VALUES ('kitchen_copies', ?, 'Cantidad de copias de comanda', 'number')`,
                 [String(kitchenCopies)]
+            );
+            await window.electronAPI.database.run(
+                `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
+                 VALUES ('kitchen_printer', ?, 'Impresora de cocina', 'string')`,
+                [kitchenPrinter]
+            );
+            await window.electronAPI.database.run(
+                `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
+                 VALUES ('kitchen_copy_dest', ?, 'Destino de copias de comanda', 'string')`,
+                [kitchenCopyDest]
             );
 
             // Caja
@@ -409,7 +436,8 @@ const BusinessSettings = ({ onNavigate }) => {
             );
 
             setSavedData({ ...formData });
-            setSavedKitchen({ enabled: kitchenEnabled, copies: kitchenCopies });
+            setSavedTicket({ printer: ticketPrinter });
+            setSavedKitchen({ enabled: kitchenEnabled, copies: kitchenCopies, printer: kitchenPrinter, copyDest: kitchenCopyDest });
             setSavedCash({ limit: limitVal, withdrawal: withdrawalVal });
             return true;
         } catch (error) {
@@ -438,6 +466,24 @@ const BusinessSettings = ({ onNavigate }) => {
         const dest = dialog?.destination;
         setDialog(null);
         if (dest && onNavigate) onNavigate(dest);
+    };
+
+    // ── Texto de vista previa del comportamiento ──────────────────────────────
+    const getBehaviorPreview = () => {
+        if (!kitchenPrinter) {
+            return 'Al finalizar la venta, aparecerá el diálogo de impresión para elegir la impresora manualmente.';
+        }
+        if (kitchenCopies === 1) {
+            if (kitchenCopyDest === 'cajero')
+                return `1 comanda saldrá junto con el ticket en el cajero al imprimir.`;
+            return `1 comanda se enviará automáticamente a "${kitchenPrinter}" al imprimir el ticket.`;
+        }
+        // 2 copias
+        if (kitchenCopyDest === 'both_cajero')
+            return `2 comandas saldrán junto con el ticket en el cajero al imprimir.`;
+        if (kitchenCopyDest === 'split')
+            return `1 comanda irá automáticamente a "${kitchenPrinter}" y la otra saldrá junto con el ticket del cajero.`;
+        return `2 comandas se enviarán automáticamente a "${kitchenPrinter}" al imprimir el ticket.`;
     };
 
     if (initialLoading) {
@@ -645,8 +691,63 @@ const BusinessSettings = ({ onNavigate }) => {
                     </Card>
 
                     {/* ── Personalización del Ticket ── */}
-                    <Card title="Personalización del Ticket">
-                        <div className="form-field">
+                    <Card title="🧾 Ticket de Venta">
+                        {/* Impresora de tickets */}
+                        <div className="kitchen-setting-row">
+                            <div className="setting-toggle-info">
+                                <p className="setting-toggle-title">Impresora de tickets</p>
+                                <p className="setting-toggle-desc">
+                                    El ticket se enviará automáticamente a esta impresora al finalizar la venta,
+                                    sin mostrar el diálogo del sistema. Si no seleccionas una, se abrirá el
+                                    diálogo de impresión normal.
+                                </p>
+                            </div>
+                            <div className="kitchen-printer-select-wrap">
+                                <select
+                                    className="bs-field-input kitchen-printer-select"
+                                    value={ticketPrinter}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val && val === kitchenPrinter) return; // bloquear misma impresora
+                                        setTicketPrinter(val);
+                                    }}
+                                    disabled={loading}
+                                >
+                                    <option value="">— Diálogo manual (por defecto) —</option>
+                                    {availablePrinters.map(p => (
+                                        <option
+                                            key={p.name}
+                                            value={p.name}
+                                            disabled={kitchenPrinter && p.name === kitchenPrinter}
+                                        >
+                                            {p.isDefault ? `⭐ ${p.name}` : p.name}
+                                            {kitchenPrinter && p.name === kitchenPrinter ? ' (en uso por cocina)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    className="kitchen-refresh-btn"
+                                    onClick={loadPrinters}
+                                    disabled={loading}
+                                    title="Actualizar lista de impresoras"
+                                >
+                                    <FiRefreshCw size={14} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {ticketPrinter && (
+                            <div className="kitchen-behavior-preview">
+                                <span className="kitchen-preview-icon">👁️</span>
+                                <span className="kitchen-preview-text">
+                                    El ticket se enviará automáticamente a <strong>{ticketPrinter}</strong> al imprimir, sin ningún diálogo.
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Mensaje de agradecimiento */}
+                        <div className="form-field" style={{ marginTop: ticketPrinter ? '16px' : '0' }}>
                             <label className="form-label">Mensaje de Agradecimiento</label>
                             <textarea
                                 name="footer_message" value={formData.footer_message}
@@ -663,6 +764,8 @@ const BusinessSettings = ({ onNavigate }) => {
 
                     {/* ── Comanda para Cocina ── */}
                     <Card title="🍽️ Comanda para Cocina">
+
+                        {/* 1 — Toggle activar comanda */}
                         <div className="setting-toggle-row">
                             <div className="setting-toggle-info">
                                 <p className="setting-toggle-title">Activar impresión de comanda</p>
@@ -677,27 +780,166 @@ const BusinessSettings = ({ onNavigate }) => {
                                 <span className="toggle-slider"></span>
                             </label>
                         </div>
+
                         {kitchenEnabled && (
-                            <div className="kitchen-copies-row">
-                                <div className="setting-toggle-info">
-                                    <p className="setting-toggle-title">Copias de comanda</p>
-                                    <p className="setting-toggle-desc">
-                                        1 copia: queda en cocina. 2 copias: una para cocina y otra para el garzón.
-                                    </p>
+                            <>
+                                {/* 2 — Copias de comanda */}
+                                <div className="kitchen-copies-row">
+                                    <div className="setting-toggle-info">
+                                        <p className="setting-toggle-title">Copias de comanda</p>
+                                        <p className="setting-toggle-desc">
+                                            ¿Cuántas comandas imprimir por venta?
+                                        </p>
+                                    </div>
+                                    <div className="copies-selector">
+                                        <button type="button"
+                                            className={`copy-btn ${kitchenCopies === 1 ? 'copy-btn--active' : ''}`}
+                                            onClick={() => handleSetCopies(1)} disabled={loading}>
+                                            1 copia
+                                        </button>
+                                        <button type="button"
+                                            className={`copy-btn ${kitchenCopies === 2 ? 'copy-btn--active' : ''}`}
+                                            onClick={() => handleSetCopies(2)} disabled={loading}>
+                                            2 copias
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="copies-selector">
-                                    <button type="button"
-                                        className={`copy-btn ${kitchenCopies === 1 ? 'copy-btn--active' : ''}`}
-                                        onClick={() => setKitchenCopies(1)} disabled={loading}>
-                                        1 copia
-                                    </button>
-                                    <button type="button"
-                                        className={`copy-btn ${kitchenCopies === 2 ? 'copy-btn--active' : ''}`}
-                                        onClick={() => setKitchenCopies(2)} disabled={loading}>
-                                        2 copias
-                                    </button>
+
+                                {/* 3 — Destino de la(s) copia(s)
+                                    Visible siempre que hay impresora configurada.
+                                    Para 1 copia: kitchen | cajero
+                                    Para 2 copias: both_kitchen | split | both_cajero        */}
+                                {kitchenPrinter && kitchenCopies === 1 && (
+                                    <div className="kitchen-copies-dest-row">
+                                        <div className="setting-toggle-info">
+                                            <p className="setting-toggle-title">Destino de la comanda</p>
+                                            <p className="setting-toggle-desc">
+                                                ¿Dónde debe aparecer la comanda al imprimir el ticket?
+                                            </p>
+                                        </div>
+                                        <div className="copies-dest-selector">
+                                            <button
+                                                type="button"
+                                                className={`copy-dest-btn ${kitchenCopyDest === 'kitchen' ? 'copy-dest-btn--active' : ''}`}
+                                                onClick={() => setKitchenCopyDest('kitchen')}
+                                                disabled={loading}
+                                            >
+                                                <span className="copy-dest-icon">🍳</span>
+                                                <span className="copy-dest-label">A la cocina</span>
+                                                <span className="copy-dest-desc">Se envía automáticamente a la impresora de cocina</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`copy-dest-btn ${kitchenCopyDest === 'cajero' ? 'copy-dest-btn--active' : ''}`}
+                                                onClick={() => setKitchenCopyDest('cajero')}
+                                                disabled={loading}
+                                            >
+                                                <span className="copy-dest-icon">🧾</span>
+                                                <span className="copy-dest-label">Al cajero</span>
+                                                <span className="copy-dest-desc">Sale junto con el ticket en el diálogo de impresión</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {kitchenPrinter && kitchenCopies === 2 && (
+                                    <div className="kitchen-copies-dest-row">
+                                        <div className="setting-toggle-info">
+                                            <p className="setting-toggle-title">Destino de las 2 copias</p>
+                                            <p className="setting-toggle-desc">
+                                                Define a dónde va cada copia de la comanda.
+                                            </p>
+                                        </div>
+                                        <div className="copies-dest-selector">
+                                            <button
+                                                type="button"
+                                                className={`copy-dest-btn ${kitchenCopyDest === 'both_kitchen' ? 'copy-dest-btn--active' : ''}`}
+                                                onClick={() => setKitchenCopyDest('both_kitchen')}
+                                                disabled={loading}
+                                            >
+                                                <span className="copy-dest-icon">🍳🍳</span>
+                                                <span className="copy-dest-label">Ambas a cocina</span>
+                                                <span className="copy-dest-desc">Las 2 van automáticamente a la impresora de cocina</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`copy-dest-btn ${kitchenCopyDest === 'split' ? 'copy-dest-btn--active' : ''}`}
+                                                onClick={() => setKitchenCopyDest('split')}
+                                                disabled={loading}
+                                            >
+                                                <span className="copy-dest-icon">🍳🧾</span>
+                                                <span className="copy-dest-label">Una a cocina + una al cajero</span>
+                                                <span className="copy-dest-desc">1 va automática a cocina, 1 sale con el ticket del cajero</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`copy-dest-btn ${kitchenCopyDest === 'both_cajero' ? 'copy-dest-btn--active' : ''}`}
+                                                onClick={() => setKitchenCopyDest('both_cajero')}
+                                                disabled={loading}
+                                            >
+                                                <span className="copy-dest-icon">🧾🧾</span>
+                                                <span className="copy-dest-label">Ambas al cajero</span>
+                                                <span className="copy-dest-desc">Las 2 salen junto con el ticket en el diálogo de impresión</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 4 — Impresora de cocina
+                                    Va después del destino porque el selector de destino
+                                    solo aparece cuando hay impresora — esto crea el flujo:
+                                    copias → (si hay printer) destino → printer        */}
+                                <div className="kitchen-setting-row">
+                                    <div className="setting-toggle-info">
+                                        <p className="setting-toggle-title">Impresora de cocina</p>
+                                        <p className="setting-toggle-desc">
+                                            La comanda se enviará automáticamente a esta impresora al finalizar la venta.
+                                            Si no seleccionas una, aparecerá el diálogo de impresión normal.
+                                        </p>
+                                    </div>
+                                    <div className="kitchen-printer-select-wrap">
+                                        <select
+                                            className="bs-field-input kitchen-printer-select"
+                                            value={kitchenPrinter}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val && val === ticketPrinter) return;
+                                                setKitchenPrinter(val);
+                                            }}
+                                            disabled={loading}
+                                        >
+                                            <option value="">— Sin impresora automática —</option>
+                                            {availablePrinters.map(p => (
+                                                <option
+                                                    key={p.name}
+                                                    value={p.name}
+                                                    disabled={ticketPrinter && p.name === ticketPrinter}
+                                                >
+                                                    {p.isDefault ? `⭐ ${p.name}` : p.name}
+                                                    {ticketPrinter && p.name === ticketPrinter ? ' (en uso por tickets)' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            className="kitchen-refresh-btn"
+                                            onClick={loadPrinters}
+                                            disabled={loading}
+                                            title="Actualizar lista de impresoras"
+                                        >
+                                            <FiRefreshCw size={14} />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+
+                                {/* 5 — Vista previa del comportamiento */}
+                                <div className="kitchen-behavior-preview">
+                                    <span className="kitchen-preview-icon">👁️</span>
+                                    <span className="kitchen-preview-text">
+                                        {getBehaviorPreview()}
+                                    </span>
+                                </div>
+                            </>
                         )}
                     </Card>
 
@@ -709,9 +951,7 @@ const BusinessSettings = ({ onNavigate }) => {
                         </p>
                         <div className="form-grid">
                             <div className="bs-field-wrap">
-                                <label className="bs-field-label">
-                                    Límite de alerta de efectivo
-                                </label>
+                                <label className="bs-field-label">Límite de alerta de efectivo</label>
                                 <div className="bs-field-prefix-wrap">
                                     <span className="bs-field-prefix">$</span>
                                     <input
@@ -727,15 +967,11 @@ const BusinessSettings = ({ onNavigate }) => {
                                 {fieldErrors.cashLimitAlert ? (
                                     <small className="bs-field-helper bs-field-error">⚠️ {fieldErrors.cashLimitAlert}</small>
                                 ) : (
-                                    <small className="bs-field-helper">
-                                        Cuando la caja supere este monto aparecerá una alerta de retiro
-                                    </small>
+                                    <small className="bs-field-helper">Cuando la caja supere este monto aparecerá una alerta de retiro</small>
                                 )}
                             </div>
                             <div className="bs-field-wrap">
-                                <label className="bs-field-label">
-                                    Monto sugerido de retiro
-                                </label>
+                                <label className="bs-field-label">Monto sugerido de retiro</label>
                                 <div className="bs-field-prefix-wrap">
                                     <span className="bs-field-prefix">$</span>
                                     <input
@@ -751,13 +987,10 @@ const BusinessSettings = ({ onNavigate }) => {
                                 {fieldErrors.cashWithdrawalAmount ? (
                                     <small className="bs-field-helper bs-field-error">⚠️ {fieldErrors.cashWithdrawalAmount}</small>
                                 ) : (
-                                    <small className="bs-field-helper">
-                                        Monto a retirar al admin, dejando el resto como fondo de vuelto
-                                    </small>
+                                    <small className="bs-field-helper">Monto a retirar al admin, dejando el resto como fondo de vuelto</small>
                                 )}
                             </div>
                         </div>
-                        {/* Vista previa del mensaje que verá el cajero */}
                         {parseCLP(cashLimitAlert) > 0 && parseCLP(cashWithdrawalAmount) > 0 &&
                          parseCLP(cashWithdrawalAmount) < parseCLP(cashLimitAlert) && (
                             <div className="bs-cash-preview">
@@ -768,9 +1001,7 @@ const BusinessSettings = ({ onNavigate }) => {
                                     el cajero verá: <em>"Se recomienda retirar{' '}
                                     <strong>${parseCLP(cashWithdrawalAmount).toLocaleString('es-CL')}</strong>{' '}
                                     y dejar{' '}
-                                    <strong>
-                                        ${(parseCLP(cashLimitAlert) - parseCLP(cashWithdrawalAmount)).toLocaleString('es-CL')}
-                                    </strong>{' '}
+                                    <strong>${(parseCLP(cashLimitAlert) - parseCLP(cashWithdrawalAmount)).toLocaleString('es-CL')}</strong>{' '}
                                     como fondo de vuelto."</em>
                                 </span>
                             </div>
@@ -801,8 +1032,7 @@ const BusinessSettings = ({ onNavigate }) => {
                         <div className="bs-dialog-icon">✅</div>
                         <p className="bs-dialog-message">Configuración guardada exitosamente.</p>
                         <div className="bs-dialog-actions">
-                            <button className="bs-dialog-btn bs-dialog-btn--success"
-                                onClick={() => setDialog(null)}>
+                            <button className="bs-dialog-btn bs-dialog-btn--success" onClick={() => setDialog(null)}>
                                 Aceptar
                             </button>
                         </div>
