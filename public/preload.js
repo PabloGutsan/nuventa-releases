@@ -14,8 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // ── Base de datos ───────────────────────────────────────────────────────
     database: {
-        save: (data) => ipcRenderer.invoke('db-save', data),
-        load: () => ipcRenderer.invoke('db-load'),
         query: (sql, params) => ipcRenderer.invoke('db-query', sql, params),
         run: (sql, params) => ipcRenderer.invoke('db-run', sql, params),
         get: (sql, params) => ipcRenderer.invoke('db-get', sql, params),

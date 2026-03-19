@@ -277,14 +277,14 @@ const UserModal = ({ user, onClose, onSave }) => {
                             {(formData.role === 'admin' ? [
                                 [true, 'Gestionar usuarios'], [true, 'Acceso a todos los reportes'],
                                 [true, 'Registrar ventas'], [true, 'Gestionar inventario'],
-                                [true, 'Gestionar gastos'], [true, 'Configuración del sistema'],
+                                [true, 'Gestionar gastos'], [true,'Gestionar promociones'], [true, 'Configuración del sistema'],
                             ] : formData.role === 'vendedor' ? [
                                 [true, 'Registrar ventas'], [true, 'Ver su historial'],
-                                [true, 'Buscar productos'], [false, 'Gestionar inventario'],
+                                [true, 'Buscar productos'], [true,'Ver promociones'], [false, 'Gestionar inventario'],
                                 [false, 'Reportes financieros'], [false, 'Gestionar usuarios'],
                             ] : [
                                 [true, 'Gestionar productos'], [true, 'Gestionar categorías'],
-                                [true, 'Ajustar stock'], [true, 'Ver movimientos'],
+                                [true, 'Ajustar stock'],[true,'Ver promociones'], [true, 'Ver movimientos'],
                                 [false, 'Registrar ventas'], [false, 'Info financiera'],
                             ]).map(([ok, label], i) => (
                                 <span key={i} className={`um-perm-badge ${ok ? 'um-perm-badge--ok' : 'um-perm-badge--no'}`}>

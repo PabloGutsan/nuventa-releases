@@ -359,3 +359,123 @@
 .stock-low     { color: #f59e0b; font-weight: 600; }
 .stock-ok      { color: #10b981; }
 .stock-unlimited { color: #6366f1; }
+
+/* ============================================================================
+   AGREGAR AL FINAL DE ProductSearch.css
+   Estilos para badges y precios de promociones en resultados de búsqueda
+   ============================================================================ */
+
+/* Ítem con promoción activa — borde sutil verde */
+.search-result-item.has-promo {
+    border-left: 3px solid #10b981;
+}
+
+.search-result-item.has-promo.selected {
+    border-left-color: #059669;
+}
+
+/* Badge pequeño sobre la imagen */
+.result-promo-img-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    background: #10b981;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+/* Asegurar que el contenedor de imagen tenga position relative */
+.result-image {
+    position: relative;
+}
+
+/* Etiqueta de promoción debajo de los detalles del producto */
+.result-promo-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 2px 8px;
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #065f46;
+    width: fit-content;
+}
+
+/* Columna de precio — ahora puede tener precio original tachado y precio promo */
+.result-price-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+/* Precio original tachado */
+.result-price--original {
+    font-size: 12px !important;
+    color: #9ca3af !important;
+    text-decoration: line-through;
+    font-weight: 400 !important;
+}
+
+/* Precio con promoción en verde */
+.result-price--promo {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: #059669 !important;
+}
+
+/* Badge para packs (muestra "3x2 — 1 gratis") */
+.result-pack-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #065f46;
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+/* ============================================================================
+   Agregar al FINAL de ProductSearch.css
+   Badge unificado de promoción — todos los tipos
+   ============================================================================ */
+
+/* Badge verde para descuentos de precio (product_discount, category_discount) */
+.result-promo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-top: 3px;
+}
+
+.result-promo-badge--green {
+    background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    color: #065f46;
+}
+
+.result-promo-badge--blue {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+}

@@ -13,21 +13,67 @@ function horasAbiertas(openedAt) {
 
 function formatHorasAbiertas(openedAt) {
     const totalMinutos = Math.floor((Date.now() - new Date(openedAt).getTime()) / 60000);
-    const horas   = Math.floor(totalMinutos / 60);
+    const horas = Math.floor(totalMinutos / 60);
     const minutos = totalMinutos % 60;
-    if (horas === 0)   return `${minutos}min`;
+    if (horas === 0) return `${minutos}min`;
     if (minutos === 0) return `${horas}h`;
     return `${horas}h ${minutos}min`;
 }
 
 function formatFechaAbierta(openedAt) {
-    const d    = new Date(openedAt);
-    const hoy  = new Date();
+    const d = new Date(openedAt);
+    const hoy = new Date();
     const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
     const hora = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    if (d.toDateString() === hoy.toDateString())  return `Hoy a las ${hora}`;
+    if (d.toDateString() === hoy.toDateString()) return `Hoy a las ${hora}`;
     if (d.toDateString() === ayer.toDateString()) return `Ayer a las ${hora}`;
     return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }) + ` a las ${hora}`;
+}
+
+// ── Calcula etiquetas de promoción para un producto ──────────────────────────
+// Devuelve un array de { label, type } para mostrar debajo del nombre.
+function getPromoLabels(product, promotions) {
+    if (!promotions?.length || !product) return [];
+    const labels = [];
+    const fmt = (v) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 }).format(v || 0);
+
+    for (const promo of promotions) {
+        if (!promo.is_active) continue;
+
+        // product_discount — descuento directo sobre este producto
+        if (promo.type === 'product_discount' && promo.product_id === product.id) {
+            const val = parseFloat(promo.discount_value) || 0;
+            if (promo.discount_type === 'percentage')
+                labels.push({ label: `${val}% descuento`, type: 'price' });
+            else if (promo.discount_type === 'fixed')
+                labels.push({ label: `$${fmt(val)} descuento`, type: 'price' });
+            else if (promo.discount_type === 'fixed_price')
+                labels.push({ label: `Precio $${fmt(val)}`, type: 'price' });
+        }
+
+        // category_discount — descuento sobre categoría del producto
+        if (promo.type === 'category_discount' && promo.category_id === product.category_id) {
+            const val = parseFloat(promo.discount_value) || 0;
+            if (promo.discount_type === 'percentage')
+                labels.push({ label: `${val}% categoría`, type: 'price' });
+            else if (promo.discount_type === 'fixed')
+                labels.push({ label: `$${fmt(val)} categoría`, type: 'price' });
+        }
+
+        // pack_fixed o pack_quantity — este producto es parte del pack
+        if ((promo.type === 'pack_fixed' || promo.type === 'pack_quantity') &&
+            promo.packProductIds?.includes(product.id)) {
+            if (promo.type === 'pack_quantity') {
+                const buy = parseInt(promo.pack_buy_quantity) || 3;
+                const pay = parseInt(promo.pack_pay_quantity) || 2;
+                labels.push({ label: `${promo.name} — ${buy}x${pay}`, type: 'pack' });
+            } else {
+                labels.push({ label: promo.name, type: 'pack' });
+            }
+        }
+    }
+
+    return labels;
 }
 
 // ── Dialog React ──────────────────────────────────────────────────────────────
@@ -35,8 +81,8 @@ const HeaderDialog = ({ dialog }) => {
     useEffect(() => {
         if (!dialog) return;
         const onKey = (e) => {
-            if (e.key === 'Escape' && dialog.onCancel)  dialog.onCancel();
-            if (e.key === 'Enter'  && dialog.onConfirm) dialog.onConfirm();
+            if (e.key === 'Escape' && dialog.onCancel) dialog.onCancel();
+            if (e.key === 'Enter' && dialog.onConfirm) dialog.onConfirm();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -69,7 +115,7 @@ const HeaderDialog = ({ dialog }) => {
 // ── Notificación de cajas abiertas ────────────────────────────────────────────
 const CashAlert = ({ user }) => {
     const [cajasAbiertas, setCajasAbiertas] = useState([]);
-    const [open,          setOpen]          = useState(false);
+    const [open, setOpen] = useState(false);
     const dropdownRef = useRef(null);
 
     const loadCajas = useCallback(async () => {
@@ -85,7 +131,7 @@ const CashAlert = ({ user }) => {
                    JOIN users u ON cr.opened_by = u.id
                    WHERE cr.status = 'open' AND cr.opened_by = ?`;
             const params = user.role === 'admin' ? [] : [user.id];
-            const rows   = await window.electronAPI.database.query(sql, params);
+            const rows = await window.electronAPI.database.query(sql, params);
             const viejas = (rows || []).filter(r => horasAbiertas(r.opened_at) >= CASH_MAX_HOURS);
             setCajasAbiertas(viejas);
         } catch (err) {
@@ -148,7 +194,6 @@ const CashAlert = ({ user }) => {
                             </div>
                         </div>
                     ))}
-
                 </div>
             )}
         </div>
@@ -157,14 +202,49 @@ const CashAlert = ({ user }) => {
 
 // ── Header principal ──────────────────────────────────────────────────────────
 const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) => {
-    const [searchTerm,   setSearchTerm]   = useState('');
-    const [results,      setResults]      = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [results, setResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
-    const [searching,    setSearching]    = useState(false);
-    const [dialog,       setDialog]       = useState(null);
+    const [searching, setSearching] = useState(false);
+    const [dialog, setDialog] = useState(null);
+    const [activePromotions, setActivePromotions] = useState([]);
 
-    const searchRef   = useRef(null);
+    const searchRef = useRef(null);
     const debounceRef = useRef(null);
+
+    // ── Cargar promociones activas al montar ──────────────────────────────────
+    useEffect(() => {
+        const loadPromotions = async () => {
+            try {
+                const promos = await window.electronAPI.database.query(`
+                    SELECT p.*
+                    FROM promotions p
+                    WHERE p.is_active = 1
+                      AND (p.starts_at IS NULL OR datetime(p.starts_at) <= datetime('now'))
+                      AND (p.ends_at   IS NULL OR datetime(p.ends_at)   >= datetime('now'))
+                `);
+                if (!Array.isArray(promos) || promos.length === 0) { setActivePromotions([]); return; }
+
+                // Enriquecer packs con sus product_ids
+                const enriched = await Promise.all(promos.map(async (promo) => {
+                    if (promo.type === 'pack_fixed' || promo.type === 'pack_quantity') {
+                        try {
+                            const items = await window.electronAPI.database.query(
+                                `SELECT product_id FROM promotion_products WHERE promotion_id = ?`,
+                                [promo.id]
+                            );
+                            return { ...promo, packProductIds: (items || []).map(i => i.product_id) };
+                        } catch { return { ...promo, packProductIds: [] }; }
+                    }
+                    return { ...promo, packProductIds: [] };
+                }));
+                setActivePromotions(enriched);
+            } catch (err) {
+                console.error('[Header] Error cargando promociones:', err);
+            }
+        };
+        loadPromotions();
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -185,7 +265,7 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
             try {
                 const data = await window.electronAPI.database.query(`
                     SELECT id, name, sale_price, stock, min_stock, unit, type,
-                           is_active, unlimited_stock
+                           is_active, unlimited_stock, category_id
                     FROM products
                     WHERE (name LIKE ? OR sku LIKE ? OR barcode LIKE ?)
                     AND is_active = 1
@@ -224,20 +304,20 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
         const openRegister = await checkOpenRegister();
         if (!openRegister) { onLogout(); return; }
         setDialog({
-            title:   '⚠️ Tienes una caja abierta',
+            title: '⚠️ Tienes una caja abierta',
             message: `Tu caja lleva activa desde ${formatFechaAbierta(openRegister.opened_at)}. Si cierras sesión sin cerrar la caja, quedará disponible cuando vuelvas a iniciar sesión.`,
             actions: [
                 {
-                    label:     'Cerrar sesión igual',
-                    variant:   'warning',
+                    label: 'Cerrar sesión igual',
+                    variant: 'warning',
                     autoFocus: false,
-                    onClick:   () => { setDialog(null); onLogout(); }
+                    onClick: () => { setDialog(null); onLogout(); }
                 },
                 {
-                    label:     'Cancelar',
-                    variant:   'cancel',
+                    label: 'Cancelar',
+                    variant: 'cancel',
                     autoFocus: true,
-                    onClick:   () => setDialog(null)
+                    onClick: () => setDialog(null)
                 },
             ]
         });
@@ -260,11 +340,11 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
             return { label: 'Servicio', color: '#6b7280' };
         if (product.unlimited_stock === 1 || product.unlimited_stock === true)
             return { label: 'Siempre disponible', color: '#7c3aed' };
-        const stock    = parseFloat(product.stock)     || 0;
+        const stock = parseFloat(product.stock) || 0;
         const minStock = parseFloat(product.min_stock) || 0;
-        if (stock <= 0)        return { label: 'Sin stock',                              color: '#ef4444' };
+        if (stock <= 0) return { label: 'Sin stock', color: '#ef4444' };
         if (stock <= minStock) return { label: `${formatStock(stock, product.unit)} ⚠️`, color: '#f59e0b' };
-        return                        { label: formatStock(stock, product.unit),          color: '#10b981' };
+        return { label: formatStock(stock, product.unit), color: '#10b981' };
     };
 
     const roleLabel = (role) => {
@@ -309,6 +389,7 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
                             )}
                             {!searching && results.map((product) => {
                                 const stockStatus = getStockStatus(product);
+                                const promoLabels = getPromoLabels(product, activePromotions);
                                 return (
                                     <div key={product.id} className="search-dropdown-item">
                                         <div className="search-item-icon">
@@ -319,6 +400,19 @@ const Header = ({ user, onLogout, sidebarOpen, businessName = "Sistema POS" }) =
                                             <span className="search-item-stock" style={{ color: stockStatus.color }}>
                                                 {stockStatus.label}
                                             </span>
+                                            {/* ── Etiquetas de promoción ── */}
+                                            {promoLabels.length > 0 && (
+                                                <div className="search-item-promos">
+                                                    {promoLabels.map((pl, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className={`search-promo-badge search-promo-badge--${pl.type}`}
+                                                        >
+                                                            {pl.type === 'pack' ? '🛒' : '🏷️'} {pl.label}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="search-item-price">
                                             {formatCurrency(product.sale_price)}

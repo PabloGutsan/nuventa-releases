@@ -12,6 +12,14 @@ const {
     clearLocalLicense
 } = require('./licenseManager');
 
+// ── Sistema de migraciones de BD ──────────────────────────────────────────────
+const runMigrations = require('../database/migrations');
+
+// Versión de migración que corresponde al schema.sql actual (v2.3).
+// Al instalar por primera vez se estampa este número para que las migraciones
+// futuras sepan que este usuario ya tiene el schema completo.
+const CURRENT_SCHEMA_MIGRATION = 3;
+
 let mainWindow;
 let db;
 let pendingUpdate = null;
@@ -28,14 +36,14 @@ function setupAutoUpdater() {
         return;
     }
 
-    autoUpdater.autoDownload         = false;
+    autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.setFeedURL({
         provider: 'github',
-        owner:    'PabloGutsan',
-        repo:     'nuventa-releases',
-        private:  false,
+        owner: 'PabloGutsan',
+        repo: 'nuventa-releases',
+        private: false,
     });
 
     autoUpdater.on('checking-for-update', () => {
@@ -45,11 +53,11 @@ function setupAutoUpdater() {
     autoUpdater.on('update-available', (info) => {
         console.log('[Updater] Nueva versión disponible:', info.version);
         pendingUpdate = {
-            hasUpdate:     true,
+            hasUpdate: true,
             latestVersion: info.version,
-            releaseNotes:  typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
-            isObligatory:  false,
-            autoDownload:  true
+            releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
+            isObligatory: false,
+            autoDownload: true
         };
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('update:available', pendingUpdate);
@@ -73,7 +81,7 @@ function setupAutoUpdater() {
         pendingUpdate = null;
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('update:downloaded', {
-                version:      info.version,
+                version: info.version,
                 releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : ''
             });
         }
@@ -179,13 +187,13 @@ function createWindow() {
                 : '¿Seguro que quieres cerrar Nuventa?';
 
             const { response } = await dialog.showMessageBox(mainWindow, {
-                type:      hasOpenCash ? 'warning' : 'question',
-                buttons:   ['Cerrar Nuventa', 'Cancelar'],
+                type: hasOpenCash ? 'warning' : 'question',
+                buttons: ['Cerrar Nuventa', 'Cancelar'],
                 defaultId: 1,
-                cancelId:  1,
-                title:     'Cerrar Nuventa',
-                message:   hasOpenCash ? '⚠️ Caja abierta' : 'Confirmar cierre',
-                detail:    message,
+                cancelId: 1,
+                title: 'Cerrar Nuventa',
+                message: hasOpenCash ? '⚠️ Caja abierta' : 'Confirmar cierre',
+                detail: message,
             });
 
             if (response === 0) {
@@ -223,6 +231,9 @@ function initDatabase() {
         db = new Database(dbPath);
         db.pragma('foreign_keys = ON');
 
+        // ── Cargar schema base ────────────────────────────────────────────────
+        // schema.sql usa CREATE TABLE IF NOT EXISTS y INSERT OR IGNORE, por lo
+        // que es seguro ejecutarlo en cada arranque — no duplica datos.
         const schemaPath = isDev
             ? path.join(__dirname, '../database/schema.sql')
             : path.join(process.resourcesPath, 'database/schema.sql');
@@ -230,9 +241,29 @@ function initDatabase() {
         if (fs.existsSync(schemaPath)) {
             const schema = fs.readFileSync(schemaPath, 'utf8');
             db.exec(schema);
-            console.log('✅ Database schema v2.1 initialized');
+            console.log('✅ Database schema v2.3 initialized');
         } else {
             console.error('❌ schema.sql no encontrado en:', schemaPath);
+        }
+
+        // ── Migraciones ───────────────────────────────────────────────────────
+        // Usamos PRAGMA user_version como número de versión del schema.
+        //
+        // • Nueva instalación (user_version = 0):
+        //   El schema.sql ya tiene todo — solo estampamos el número actual
+        //   para que las migraciones futuras no vuelvan a correr en este equipo.
+        //
+        // • Instalación existente (user_version > 0):
+        //   runMigrations aplica solo las migraciones que faltan.
+        const userVersion = db.pragma('user_version')[0]?.user_version ?? 0;
+
+        if (userVersion === 0) {
+            // Primer arranque en este equipo — BD recién creada desde schema.sql
+            db.pragma(`user_version = ${CURRENT_SCHEMA_MIGRATION}`);
+            console.log(`✅ Nueva instalación — BD estampada en versión ${CURRENT_SCHEMA_MIGRATION}`);
+        } else {
+            // Usuario existente — aplicar migraciones pendientes si las hay
+            runMigrations(db);
         }
 
         createDefaultAdmin();
@@ -297,7 +328,7 @@ ipcMain.handle('db-transaction', async (event, operations) => {
 // IPC — LICENCIA
 // ============================================================================
 
-ipcMain.handle('license:check',    async ()  => checkLicense());
+ipcMain.handle('license:check', async () => checkLicense());
 ipcMain.handle('license:activate', async (event, licenseKey, email, businessName) =>
     await activateLicense(licenseKey, email, businessName)
 );
@@ -335,9 +366,9 @@ ipcMain.handle('save-file', async (event, data, defaultPath) => {
         defaultPath,
         filters: [
             { name: 'Excel Files', extensions: ['xlsx'] },
-            { name: 'PDF Files',   extensions: ['pdf']  },
-            { name: 'CSV Files',   extensions: ['csv']  },
-            { name: 'All Files',   extensions: ['*']    }
+            { name: 'PDF Files', extensions: ['pdf'] },
+            { name: 'CSV Files', extensions: ['csv'] },
+            { name: 'All Files', extensions: ['*'] }
         ]
     });
     refocusWindow();
@@ -474,10 +505,6 @@ ipcMain.handle('window:refocus', () => {
 
 // ============================================================================
 // IPC — GAVETA DE DINERO
-// FIX: este handler faltaba — preload.js expone cashDrawer.open(printerName)
-// invocando 'open-cash-drawer', pero el handler no existía en electron.js.
-// La gaveta se abre enviando el comando ESC/POS kick (ESC p 0 25 250)
-// a la impresora de recibos que tenga conectada la gaveta.
 // ============================================================================
 
 ipcMain.handle('open-cash-drawer', async (event, printerName) => {
@@ -489,8 +516,6 @@ ipcMain.handle('open-cash-drawer', async (event, printerName) => {
             webPreferences: { nodeIntegration: false, contextIsolation: true }
         });
 
-        // Comando ESC/POS estándar para abrir gaveta (compatible Epson, Star, Bixolon, etc.)
-        // ESC p 0 25 250  →  \x1B\x70\x00\x19\xFA
         const drawerHTML = `<!DOCTYPE html>
 <html><head><style>
   @page { size: 1mm 1mm; margin: 0; }
@@ -506,10 +531,10 @@ ipcMain.handle('open-cash-drawer', async (event, printerName) => {
         const result = await new Promise((resolve) => {
             drawerWin.webContents.print(
                 {
-                    silent:          true,
+                    silent: true,
                     printBackground: true,
-                    deviceName:      printerName || '',
-                    margins:         { marginType: 'none' },
+                    deviceName: printerName || '',
+                    margins: { marginType: 'none' },
                 },
                 (success, reason) => resolve({ success, reason })
             );
@@ -528,16 +553,14 @@ ipcMain.handle('open-cash-drawer', async (event, printerName) => {
 // IPC — IMPRESORA DE COCINA
 // ============================================================================
 
-// Listar impresoras del sistema
-// Usado por BusinessSettings.jsx (selector) y cashDrawer
 ipcMain.handle('get-printers', async () => {
     try {
         const printers = await mainWindow.webContents.getPrintersAsync();
         return printers.map(p => ({
-            name:        p.name,
+            name: p.name,
             description: p.description || p.name,
-            isDefault:   p.isDefault,
-            status:      p.status,
+            isDefault: p.isDefault,
+            status: p.status,
         }));
     } catch (error) {
         console.error('[Printers] Error listando impresoras:', error);
@@ -545,9 +568,6 @@ ipcMain.handle('get-printers', async () => {
     }
 });
 
-// Imprimir HTML silenciosamente en impresora específica (sin diálogo del SO)
-// FIX: pageSize.height subido de 297000 (297 mm = A4) a 600000 (600 mm)
-// para que comandas con muchos productos no se corten.
 ipcMain.handle('print-silent', async (event, { html, printerName, copies = 1 }) => {
     try {
         const printWin = new BrowserWindow({
@@ -564,19 +584,17 @@ ipcMain.handle('print-silent', async (event, { html, printerName, copies = 1 }) 
             `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
         );
 
-        // Esperar a que el renderer pinte el contenido completo
         await new Promise(resolve => setTimeout(resolve, 800));
 
         const printResult = await new Promise((resolve) => {
             printWin.webContents.print(
                 {
-                    silent:          true,
+                    silent: true,
                     printBackground: true,
-                    deviceName:      printerName,
-                    copies:          copies,
-                    margins:         { marginType: 'none' },
-                    // 80 mm de ancho, 600 mm de alto — suficiente para cualquier comanda
-                    pageSize:        { width: 80000, height: 600000 },
+                    deviceName: printerName,
+                    copies: copies,
+                    margins: { marginType: 'none' },
+                    pageSize: { width: 80000, height: 600000 },
                 },
                 (success, reason) => resolve({ success, reason })
             );
@@ -623,7 +641,7 @@ app.whenReady().then(() => {
                     console.warn("[License] Licencia invalida en verificacion periodica:", result.reason);
                     if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.webContents.send("license:revoked", {
-                            reason:  result.reason  || "INACTIVE",
+                            reason: result.reason || "INACTIVE",
                             message: result.message || "Tu licencia ha sido cancelada. Contacta a soporte en nuventa.cl."
                         });
                     }

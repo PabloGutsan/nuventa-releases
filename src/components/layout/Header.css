@@ -515,3 +515,38 @@
     border-top: 1px solid #e5e7eb;
     text-align: center;
 }
+
+/* ── Agregar al final de Header.css ── */
+
+/* Contenedor de etiquetas de promoción bajo el nombre del producto */
+.search-item-promos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+/* Badge base */
+.search-promo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+/* Verde — descuento directo de precio */
+.search-promo-badge--price {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+/* Azul — pack */
+.search-promo-badge--pack {
+    background: #dbeafe;
+    color: #1d4ed8;
+}

@@ -1,14 +1,12 @@
 // src/pages/POS/ProductSearch.jsx
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FiSearch, FiPackage, FiX, FiAlertTriangle } from 'react-icons/fi';
+import { FiSearch, FiPackage, FiX, FiAlertTriangle, FiTag } from 'react-icons/fi';
 import './ProductSearch.css';
 
-// ── Detección de plataforma ───────────────────────────────────────────────────
 const isMac = () => window.electronAPI?.platform === 'darwin';
 const kbd = (windowsKey, macKey) => isMac() ? macKey : windowsKey;
 
-// ── Helper: restaurar foco (robusto Electron) ─────────────────────────────────
 const restoreFocus = (ref) => {
     if (!ref?.current) return;
     ref.current.focus();
@@ -17,14 +15,12 @@ const restoreFocus = (ref) => {
     );
 };
 
-// ── Dialog React ──────────────────────────────────────────────────────────────
 const AlertDialog = ({ message, onClose }) => {
     useEffect(() => {
         const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') onClose(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [onClose]);
-
     if (!message) return null;
     return (
         <div className="ps-alert-overlay" onClick={onClose}>
@@ -37,7 +33,6 @@ const AlertDialog = ({ message, onClose }) => {
     );
 };
 
-// ── Helpers de stock ──────────────────────────────────────────────────────────
 const formatStock = (value) => {
     const n = parseFloat(value);
     if (isNaN(n)) return '0';
@@ -76,7 +71,73 @@ const hasAvailableStock = (product) => {
     return parseFloat(product.stock) > 0;
 };
 
-// ── Buscar productos (síncrono, sin depender de estado React) ─────────────────
+// ── Helpers de promociones ────────────────────────────────────────────────────
+const getProductPromotion = (product, activePromotions) => {
+    if (!activePromotions || activePromotions.length === 0) return null;
+    const byProduct  = activePromotions.find(p => p.type === 'product_discount' && p.product_id === product.id);
+    if (byProduct) return byProduct;
+    const byPackFixed = activePromotions.find(p =>
+        p.type === 'pack_fixed' && p.packProductIds && p.packProductIds.includes(product.id)
+    );
+    if (byPackFixed) return byPackFixed;
+    const byPackQty = activePromotions.find(p =>
+        p.type === 'pack_quantity' && (
+            (p.pack_quantity_source === 'product_list' && p.packProductIds && p.packProductIds.includes(product.id)) ||
+            (p.pack_quantity_source === 'category' && p.category_id === product.category_id)
+        )
+    );
+    if (byPackQty) return byPackQty;
+    const byCategory = activePromotions.find(p =>
+        p.type === 'category_discount' && p.category_id === product.category_id
+    );
+    if (byCategory) return byCategory;
+    return null;
+};
+
+/**
+ * Badge de texto para mostrar en resultados de búsqueda.
+ * Retorna { text, color } según el tipo de promoción.
+ */
+const getPromoBadge = (promo, product) => {
+    if (!promo) return null;
+    const val = parseFloat(promo.discount_value) || 0;
+
+    switch (promo.type) {
+        case 'product_discount':
+            if (promo.discount_type === 'percentage') return { text: `${val}% off`, color: 'green' };
+            if (promo.discount_type === 'fixed')      return { text: `−$${val.toLocaleString('es-CL')}`, color: 'green' };
+            return { text: 'Oferta', color: 'green' };
+
+        case 'category_discount':
+            if (promo.discount_type === 'percentage') return { text: `${val}% categoría`, color: 'green' };
+            if (promo.discount_type === 'fixed')      return { text: `−$${val.toLocaleString('es-CL')} categoría`, color: 'green' };
+            return { text: 'Desc. categoría', color: 'green' };
+
+        case 'pack_fixed':
+            return { text: `Pack ${promo.name}`, color: 'blue' };
+
+        case 'pack_quantity': {
+            const buy  = parseInt(promo.pack_buy_quantity) || 2;
+            const pay  = parseInt(promo.pack_pay_quantity) || 1;
+            return { text: `${buy}x${pay} — ${buy - pay} gratis`, color: 'blue' };
+        }
+
+        default:
+            return null;
+    }
+};
+
+const getPriceWithPromo = (product, promo) => {
+    if (!promo || promo.type === 'pack_fixed' || promo.type === 'pack_quantity' || promo.type === 'minimum_amount') return null;
+    const price = parseFloat(product.sale_price) || 0;
+    const val   = parseFloat(promo.discount_value) || 0;
+    if (promo.discount_type === 'percentage')  return Math.round(price * (1 - val / 100));
+    if (promo.discount_type === 'fixed')       return Math.max(0, price - val);
+    if (promo.discount_type === 'fixed_price') return val;
+    return null;
+};
+
+// ── Búsqueda ──────────────────────────────────────────────────────────────────
 const searchProducts = (products, term) => {
     if (!Array.isArray(products) || !term) return [];
     const t = term.toLowerCase().trim();
@@ -93,7 +154,6 @@ const searchProducts = (products, term) => {
         .slice(0, 10);
 };
 
-// Match exacto de barcode o SKU (para pistola láser)
 const findExactMatch = (products, code) => {
     if (!Array.isArray(products) || !code) return null;
     const c = code.trim();
@@ -106,36 +166,25 @@ const findExactMatch = (products, code) => {
 };
 
 // ── ProductSearch ─────────────────────────────────────────────────────────────
-const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
+const ProductSearch = ({ products, onAddToCart, searchInputRef, activePromotions = [] }) => {
     const [searchTerm,       setSearchTerm]       = useState('');
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [selectedIndex,    setSelectedIndex]    = useState(0);
     const [alertMessage,     setAlertMessage]     = useState(null);
 
-    // ── Detección de pistola láser ────────────────────────────────────────────
-    // La pistola envía todos los caracteres en < 50ms por tecla y termina con Enter.
-    // Usamos refs para no depender del ciclo de render de React.
     const lastKeyTime   = useRef(0);
     const scannerBuffer = useRef('');
     const scannerTimer  = useRef(null);
-    const SCANNER_MS    = 50; // umbral: gap < 50ms entre teclas = pistola
+    const SCANNER_MS    = 50;
 
-    const closeAlert = () => {
-        setAlertMessage(null);
-        restoreFocus(searchInputRef);
-    };
+    const closeAlert = () => { setAlertMessage(null); restoreFocus(searchInputRef); };
 
-    // ── Fix Electron: recuperar foco automáticamente ──────────────────────────
     useEffect(() => {
         requestAnimationFrame(() => {
             searchInputRef.current?.focus();
             setTimeout(() => searchInputRef.current?.focus(), 100);
         });
-
-        const handleWindowFocus = () => {
-            setTimeout(() => searchInputRef.current?.focus(), 150);
-        };
-
+        const handleWindowFocus = () => setTimeout(() => searchInputRef.current?.focus(), 150);
         const handleClick = (e) => {
             if (e.target.closest('.search-results'))     return;
             if (e.target.closest('.ps-alert-overlay'))   return;
@@ -151,7 +200,6 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
             if (e.target.closest('textarea'))            return;
             setTimeout(() => searchInputRef.current?.focus(), 50);
         };
-
         window.addEventListener('focus', handleWindowFocus);
         document.addEventListener('click', handleClick);
         return () => {
@@ -160,43 +208,29 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
         };
     }, [searchInputRef]);
 
-    // ── Filtrar al escribir manualmente ───────────────────────────────────────
     useEffect(() => {
-        if (searchTerm.length === 0) {
-            setFilteredProducts([]);
-            return;
-        }
+        if (searchTerm.length === 0) { setFilteredProducts([]); return; }
         setFilteredProducts(searchProducts(products, searchTerm));
         setSelectedIndex(0);
     }, [searchTerm, products]);
 
-    // ── Seleccionar producto ──────────────────────────────────────────────────
     const handleSelectProduct = useCallback((product) => {
         try {
-            if (!product || typeof product !== 'object') {
-                setAlertMessage('Error: producto inválido.');
-                return;
-            }
+            if (!product || typeof product !== 'object') { setAlertMessage('Error: producto inválido.'); return; }
             if (product.is_active === false || product.is_active === 0) {
-                setAlertMessage(`El producto "${product.name}" no está activo.`);
-                return;
+                setAlertMessage(`El producto "${product.name}" no está activo.`); return;
             }
-
             if (product.type === 'product') {
                 const isUnlimited   = product.unlimited_stock    === true || product.unlimited_stock    === 1;
                 const allowNegative = product.allow_negative_stock === true || product.allow_negative_stock === 1;
                 if (!isUnlimited && !allowNegative) {
-                    const stock     = parseFloat(product.stock) || 0;
-                    const unitLabel = getUnitLabel(product);
+                    const stock = parseFloat(product.stock) || 0;
                     if (stock <= 0) {
-                        setAlertMessage(
-                            `"${product.name}" no tiene stock disponible.\n\nStock actual: ${formatStock(stock)}${unitLabel ? ' ' + unitLabel : ''}`
-                        );
+                        setAlertMessage(`"${product.name}" no tiene stock disponible.\n\nStock actual: ${formatStock(stock)}${getUnitLabel(product) ? ' ' + getUnitLabel(product) : ''}`);
                         return;
                     }
                 }
             }
-
             onAddToCart(product);
             setSearchTerm('');
             setFilteredProducts([]);
@@ -212,78 +246,42 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
         }
     }, [onAddToCart, searchInputRef]);
 
-    // ── Teclado ───────────────────────────────────────────────────────────────
     const handleKeyDown = (e) => {
         const now = Date.now();
         const gap = now - lastKeyTime.current;
         lastKeyTime.current = now;
 
-        // Acumular buffer de scanner (teclas muy rápidas, carácter a carácter)
         if (e.key !== 'Enter' && e.key.length === 1 && gap < SCANNER_MS) {
             if (scannerTimer.current) clearTimeout(scannerTimer.current);
             scannerBuffer.current += e.key;
-            // Si no llega Enter en 300ms → no era scanner, limpiar buffer
-            scannerTimer.current = setTimeout(() => {
-                scannerBuffer.current = '';
-            }, 300);
-            // Dejar que el input reciba el carácter normalmente
+            scannerTimer.current = setTimeout(() => { scannerBuffer.current = ''; }, 300);
             return;
         }
 
-        // ── Enter ─────────────────────────────────────────────────────────────
         if (e.key === 'Enter') {
             e.preventDefault();
             if (scannerTimer.current) clearTimeout(scannerTimer.current);
-
-            // Código a buscar: buffer del scanner o valor actual del input
             const code = (scannerBuffer.current || e.target.value || searchTerm).trim();
             scannerBuffer.current = '';
-
             if (!code) return;
-
-            // 1) Match exacto por barcode/SKU (scanner)
             const exact = findExactMatch(products, code);
-            if (exact) {
-                handleSelectProduct(exact);
-                return;
-            }
-
-            // 2) Hay resultados en pantalla → seleccionar el marcado
+            if (exact) { handleSelectProduct(exact); return; }
             if (filteredProducts.length > 0) {
-                handleSelectProduct(filteredProducts[selectedIndex] || filteredProducts[0]);
-                return;
+                handleSelectProduct(filteredProducts[selectedIndex] || filteredProducts[0]); return;
             }
-
-            // 3) Búsqueda síncrona (estado React quizás no actualizó aún)
             const syncResults = searchProducts(products, code);
-            if (syncResults.length === 1) {
-                handleSelectProduct(syncResults[0]);
-            } else if (syncResults.length > 1) {
-                setFilteredProducts(syncResults);
-                setSelectedIndex(0);
-            } else {
-                setAlertMessage(`No se encontró ningún producto con el código: "${code}"`);
-            }
+            if (syncResults.length === 1)      handleSelectProduct(syncResults[0]);
+            else if (syncResults.length > 1) { setFilteredProducts(syncResults); setSelectedIndex(0); }
+            else setAlertMessage(`No se encontró ningún producto con el código: "${code}"`);
             return;
         }
 
-        // ── Navegación con teclado ────────────────────────────────────────────
         if (filteredProducts.length === 0) return;
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setSelectedIndex(prev => prev < filteredProducts.length - 1 ? prev + 1 : prev);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setSelectedIndex(prev => prev > 0 ? prev - 1 : 0);
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            setSearchTerm('');
-            setFilteredProducts([]);
-        }
+        if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(prev => prev < filteredProducts.length - 1 ? prev + 1 : prev); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(prev => prev > 0 ? prev - 1 : 0); }
+        else if (e.key === 'Escape') { e.preventDefault(); setSearchTerm(''); setFilteredProducts([]); }
     };
 
-    // ── Limpiar ───────────────────────────────────────────────────────────────
     const handleClearSearch = () => {
         setSearchTerm('');
         setFilteredProducts([]);
@@ -294,11 +292,10 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
 
     const formatCurrency = (value) => (parseFloat(value) || 0).toLocaleString('es-CL');
 
-    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="product-search">
 
-            {/* ── Input de búsqueda ── */}
+            {/* ── Input ── */}
             <div className="search-input-wrapper">
                 <div className="search-icon-container">
                     <FiSearch size={24} />
@@ -314,8 +311,7 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                     autoFocus
                 />
                 {searchTerm.length > 0 && (
-                    <button className="search-clear-button" onClick={handleClearSearch}
-                        title="Limpiar búsqueda (ESC)" type="button">
+                    <button className="search-clear-button" onClick={handleClearSearch} title="Limpiar búsqueda (ESC)" type="button">
                         <FiX size={18} />
                     </button>
                 )}
@@ -325,11 +321,15 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
             {filteredProducts.length > 0 && (
                 <div className="search-results">
                     {filteredProducts.map((product, index) => {
-                        const sinStock = !hasAvailableStock(product);
+                        const sinStock   = !hasAvailableStock(product);
+                        const promo      = getProductPromotion(product, activePromotions);
+                        const badge      = getPromoBadge(promo, product);
+                        const promoPrice = getPriceWithPromo(product, promo);
+
                         return (
                             <div
                                 key={product.id}
-                                className={`search-result-item ${index === selectedIndex ? 'selected' : ''} ${sinStock ? 'out-of-stock' : ''}`}
+                                className={`search-result-item ${index === selectedIndex ? 'selected' : ''} ${sinStock ? 'out-of-stock' : ''} ${promo ? 'has-promo' : ''}`}
                                 onClick={() => handleSelectProduct(product)}
                                 title={sinStock ? `Sin stock — ${getStockText(product)}` : undefined}
                             >
@@ -341,35 +341,54 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                                                 e.target.nextSibling.style.display = 'flex';
                                             }} />
                                     ) : null}
-                                    <div style={{
-                                        display: product.image_path ? 'none' : 'flex',
-                                        width: '100%', height: '100%',
-                                        alignItems: 'center', justifyContent: 'center'
-                                    }}>
+                                    <div style={{ display: product.image_path ? 'none' : 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
                                         <FiPackage size={32} />
                                     </div>
+                                    {badge && (
+                                        <div className="result-promo-img-badge">
+                                            <FiTag size={9} />
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="result-info">
                                     <div className="result-name">
                                         {product.name}
-                                        {product.type === 'service' && (
-                                            <span className="service-badge">SERVICIO</span>
-                                        )}
-                                        {sinStock && (
-                                            <span className="no-stock-badge">SIN STOCK</span>
-                                        )}
+                                        {sinStock && <span className="no-stock-badge">SIN STOCK</span>}
                                     </div>
                                     <div className="result-details">
                                         {product.sku     && <span>SKU: {product.sku}</span>}
                                         {product.barcode && <span>Cód: {product.barcode}</span>}
                                         <span className={getStockClassName(product)}>
-                                            {getStockText(product)}
+                                            {product.type === 'service' ? 'Servicio' : getStockText(product)}
                                         </span>
                                     </div>
                                 </div>
 
-                                <div className="result-price">${formatCurrency(product.sale_price)}</div>
+                                <div className="result-price-col">
+                                    {/* Precio original tachado si hay descuento de precio */}
+                                    {promoPrice !== null ? (
+                                        <>
+                                            <span className="result-price result-price--original">
+                                                ${formatCurrency(product.sale_price)}
+                                            </span>
+                                            <span className="result-price result-price--promo">
+                                                ${formatCurrency(promoPrice)}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="result-price">
+                                            ${formatCurrency(product.sale_price)}
+                                        </span>
+                                    )}
+
+                                    {/* Badge de promoción — todos los tipos */}
+                                    {badge && (
+                                        <span className={`result-promo-badge result-promo-badge--${badge.color}`}>
+                                            <FiTag size={9} /> {badge.text}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
@@ -401,7 +420,6 @@ const ProductSearch = ({ products, onAddToCart, searchInputRef }) => {
                 </div>
             )}
 
-            {/* ── Alert Dialog React ── */}
             {alertMessage && <AlertDialog message={alertMessage} onClose={closeAlert} />}
         </div>
     );

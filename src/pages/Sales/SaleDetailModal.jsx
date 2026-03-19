@@ -13,7 +13,7 @@ import './SaleDetailModal.css';
 const SaleDetailModal = ({ sale, onClose, onCancel, isAdmin = false }) => {
     const { db } = useDatabase();
     const [showPrintModal, setShowPrintModal] = useState(false);
-    const [businessInfo,   setBusinessInfo]   = useState(null);
+    const [businessInfo, setBusinessInfo] = useState(null);
 
     const businessRepo = new BusinessRepository(db);
 
@@ -49,23 +49,23 @@ const SaleDetailModal = ({ sale, onClose, onCancel, isAdmin = false }) => {
         new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v || 0);
 
     const fmtPayment = (m) => ({
-        efectivo:        'Efectivo',
-        tarjeta_debito:  'Tarjeta de Débito',
+        efectivo: 'Efectivo',
+        tarjeta_debito: 'Tarjeta de Débito',
         tarjeta_credito: 'Tarjeta de Crédito',
-        transferencia:   'Transferencia',
-        multiple:        'Múltiple',
+        transferencia: 'Transferencia',
+        multiple: 'Múltiple',
     }[m] || m);
 
     const fmtDoc = (t) => ({
-        boleta_fisica:       'Boleta Física',
-        boleta_electronica:  'Boleta Electrónica',
-        factura_fisica:      'Factura Física',
+        boleta_fisica: 'Boleta Física',
+        boleta_electronica: 'Boleta Electrónica',
+        factura_fisica: 'Factura Física',
         factura_electronica: 'Factura Electrónica',
-        sin_documento:       'Sin Documento',
+        sin_documento: 'Sin Documento',
     }[t] || t);
 
-    const handleClose      = () => { document.body.style.overflow = ''; onClose(); };
-    const handleOpenPrint  = () => setShowPrintModal(true);
+    const handleClose = () => { document.body.style.overflow = ''; onClose(); };
+    const handleOpenPrint = () => setShowPrintModal(true);
     const handleClosePrint = () => { setShowPrintModal(false); document.body.style.overflow = 'hidden'; };
 
     const itemsCount = Array.isArray(sale.items) ? sale.items.length : 0;
@@ -304,12 +304,27 @@ const SaleDetailModal = ({ sale, onClose, onCancel, isAdmin = false }) => {
                                     <span>Subtotal</span>
                                     <span>{fmt(sale.subtotal)}</span>
                                 </div>
-                                {sale.discount > 0 && (
+                                {(parseFloat(sale.promotion_discount) || 0) > 0 && (
                                     <div className="sdm-sale-total-row sdm-sale-total-discount">
-                                        <span>Descuento</span>
-                                        <span>-{fmt(sale.discount)}</span>
+                                        <span>Dto. promociones</span>
+                                        <span>-{fmt(sale.promotion_discount)}</span>
                                     </div>
                                 )}
+                                {(parseFloat(sale.manual_discount) || 0) > 0 && (
+                                    <div className="sdm-sale-total-row sdm-sale-total-discount">
+                                        <span>Dto. manual</span>
+                                        <span>-{fmt(sale.manual_discount)}</span>
+                                    </div>
+                                )}
+                                {/* Fallback: si no hay desglose pero sí hay descuento total */}
+                                {(parseFloat(sale.promotion_discount) || 0) === 0 &&
+                                    (parseFloat(sale.manual_discount) || 0) === 0 &&
+                                    (parseFloat(sale.discount) || 0) > 0 && (
+                                        <div className="sdm-sale-total-row sdm-sale-total-discount">
+                                            <span>Descuento</span>
+                                            <span>-{fmt(sale.discount)}</span>
+                                        </div>
+                                    )}
                                 {sale.tax > 0 && (
                                     <div className="sdm-sale-total-row">
                                         <span>IVA</span>

@@ -430,3 +430,32 @@
 }
 .kitchen-preview-icon { font-size: 16px; flex-shrink: 0; }
 .kitchen-preview-text { line-height: 1.5; }
+
+/* ── Ventas y Descuentos — estilos adicionales [v2.2] ── */
+
+.bs-divider {
+    height: 1px;
+    background: #f3f4f6;
+    margin: 12px 0;
+}
+
+.bs-field-suffix {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    pointer-events: none;
+}
+
+.bs-field-prefix-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.bs-field-input--prefixed {
+    padding-right: 32px !important;
+}

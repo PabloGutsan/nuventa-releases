@@ -20,6 +20,8 @@ import Reports from './pages/Reports/Reports';
 import LicenseActivation from './pages/License/LicenseActivation';
 import UpdateBanner from './components/common/UpdateBanner';
 import PurchaseHistory from './pages/Inventory/PurchaseHistory';
+import PromotionList from './pages/Promotions/PromotionList';
+
 import './App.css';
 
 // ── Pantalla de carga inicial ─────────────────────────────────────────────────
@@ -103,6 +105,7 @@ function AuthenticatedApp() {
             case 'pos':        return <POSMain onNavigate={handleNavigate} />;
             case 'ventas':     return <SalesHistory salesFilter={salesFilter} currentUser={currentUser} />;
             case 'products':   return <ProductList />;
+            case 'promotions': return <PromotionList />;
             case 'compras':    return <PurchaseHistory />;
             case 'suppliers':  return <SupplierList />;
             case 'customers':  return <CustomerList />;

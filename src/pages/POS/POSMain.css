@@ -1,28 +1,35 @@
-/* src/pages/POS/POSMain.css */
+/* src/pages/POS/POSMain.css — VERSIÓN NUEVO LAYOUT */
 
+/* ── Contenedor principal ─────────────────────────────────────────────────── */
 .pos-main {
     display: flex;
+    flex-direction: row;
     height: calc(100vh - 70px);
     width: 100%;
     overflow: hidden;
     position: relative;
 }
 
-/* ── Centro ── */
-.pos-center {
+/* ── Panel izquierdo — buscador arriba + ítems abajo ─────────────────────── */
+.pos-left {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 30px;
-    overflow-y: auto;
-    background-color: var(--gray-50);
+    overflow: hidden;
+    min-width: 0;
+    background: #f8f9ff;
+    position: relative;  /* contexto para dropdown absoluto */
 }
 
+/* ── Header ── */
 .pos-header {
-    margin-bottom: 30px;
+    background: #ffffff;
+    border-bottom: 1px solid #e8eaf6;
+    flex-shrink: 0;
+    padding: 12px 20px 10px;
+    margin-bottom: 0;
 }
 
-/* Fila título + botón de caja */
 .pos-header-top {
     display: flex;
     align-items: center;
@@ -31,43 +38,120 @@
 }
 
 .pos-title {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
-    color: var(--gray-900);
-    margin: 0 0 8px 0;
+    color: #1e1b4b;
+    margin: 0 0 4px 0;
 }
 
 .pos-subtitle {
-    font-size: 16px;
-    color: var(--gray-500);
+    font-size: 13px;
+    color: #94a3b8;
     margin: 0;
 }
 
-/* ── Responsive ── */
-@media (max-width: 1024px) {
-    .pos-main {
-        flex-direction: column;
-        height: auto;
-        overflow: visible;
-    }
-
-    .pos-center {
-        padding: 20px;
-    }
-
-    .pos-title {
-        font-size: 24px;
-    }
-
-    .pos-header-top {
-        flex-wrap: wrap;
-        gap: 12px;
-    }
+/* ── Atajos de teclado en subtítulo ── */
+.keyboard-hints {
+    margin-left: 10px;
+    font-size: 12px;
+    color: #b0bec5;
 }
 
-/* ===============================================
-   TOAST DE ÉXITO
-   =============================================== */
+/* ─────────────────────────────────────────────────────────────────────────────
+   OVERRIDE ProductSearch — el componente original tiene flex:1 que lo expande
+   a todo el alto. En el nuevo layout debe ocupar SOLO el alto del input.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Wrapper del buscador: solo el alto del input, NO crece */
+.pos-left .product-search {
+    flex: 0 0 auto !important;
+    display: block !important;          /* sobreescribir flex column del original */
+    background: #ffffff;
+    border-bottom: 1px solid #e8eaf6;
+    position: relative;                 /* contexto para dropdown */
+    z-index: 20;
+    padding: 10px 20px;
+}
+
+/* Input wrapper — ajuste de tamaño para nuevo layout */
+.pos-left .product-search .search-input-wrapper {
+    margin-bottom: 0 !important;
+    border-radius: 10px;
+}
+
+.pos-left .product-search .search-input-flex {
+    padding: 12px 8px !important;
+    font-size: 15px !important;
+}
+
+.pos-left .product-search .search-icon-container {
+    padding: 0 12px !important;
+}
+
+/* ── Resultados de búsqueda — dropdown absoluto sobre los ítems ── */
+.pos-left .product-search .search-results {
+    position: absolute !important;
+    top: calc(100% - 10px);   /* justo debajo del padding bottom del wrapper */
+    left: 20px;
+    right: 20px;
+    z-index: 100;
+    max-height: 420px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1.5px solid #c7d2fe;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 12px 32px rgba(79, 70, 229, 0.14);
+}
+
+/* "Sin resultados" — mismo dropdown */
+.pos-left .product-search .no-results {
+    position: absolute !important;
+    top: calc(100% - 10px);
+    left: 20px;
+    right: 20px;
+    z-index: 100;
+    background: #ffffff;
+    border: 1.5px solid #c7d2fe;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 20px;
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+}
+
+.pos-left .product-search .no-results svg {
+    color: #cbd5e1;
+    margin: 0;
+}
+
+.pos-left .product-search .no-results p {
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    margin: 0;
+}
+
+.pos-left .product-search .no-results small {
+    font-size: 11px;
+    color: #94a3b8;
+    display: block;
+}
+
+/* Estado vacío — OCULTO en nuevo layout (los ítems hacen esa función) */
+.pos-left .product-search .search-empty {
+    display: none !important;
+}
+
+/* ── Área de ítems — ocupa el resto del panel izquierdo ── */
+/* CartItemsSection ya tiene flex:1 y overflow-y:auto */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TOAST, LOADING, DIALOG (sin cambios respecto al original)
+───────────────────────────────────────────────────────────────────────────── */
 
 .success-toast {
     position: fixed;
@@ -90,27 +174,17 @@
     font-size: 16px;
 }
 
-.success-icon {
-    font-size: 24px;
-}
-
-.success-message {
-    font-size: 15px;
-}
+.success-icon   { font-size: 24px; }
+.success-message { font-size: 15px; }
 
 @keyframes slideInRight {
     from { transform: translateX(400px); opacity: 0; }
     to   { transform: translateX(0);     opacity: 1; }
 }
-
 @keyframes slideOutRight {
     from { transform: translateX(0);     opacity: 1; }
     to   { transform: translateX(400px); opacity: 0; }
 }
-
-/* ===============================================
-   LOADING
-   =============================================== */
 
 .loading-container {
     display: flex;
@@ -119,21 +193,20 @@
     justify-content: center;
     flex: 1;
     gap: 16px;
-    color: var(--gray-500);
+    color: #94a3b8;
 }
 
 .spinner {
     width: 36px;
     height: 36px;
-    border: 3px solid var(--gray-200);
-    border-top-color: var(--primary-600);
+    border: 3px solid #e2e8f0;
+    border-top-color: #4f46e5;
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── POSDialog (reemplaza window.alert y window.confirm en POSMain) ── */
 .pos-dialog-overlay {
     position: fixed;
     inset: 0;
@@ -159,22 +232,10 @@
     text-align: center;
 }
 
-.pos-dialog-icon  { font-size: 2.2rem; line-height: 1; }
+.pos-dialog-icon    { font-size: 2.2rem; line-height: 1; }
+.pos-dialog-message { font-size: 0.92rem; color: #374151; line-height: 1.6; white-space: pre-line; margin: 0; }
 
-.pos-dialog-message {
-    font-size: 0.92rem;
-    color: #374151;
-    line-height: 1.6;
-    white-space: pre-line;
-    margin: 0;
-}
-
-.pos-dialog-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 4px;
-    width: 100%;
-}
+.pos-dialog-actions { display: flex; gap: 10px; margin-top: 4px; width: 100%; }
 
 .pos-dialog-btn {
     flex: 1;
@@ -187,15 +248,21 @@
     transition: background 0.15s, transform 0.1s;
 }
 .pos-dialog-btn:active { transform: scale(0.98); }
-
 .pos-dialog-btn--cancel  { background: #f3f4f6; color: #374151; }
 .pos-dialog-btn--cancel:hover  { background: #e5e7eb; }
-
 .pos-dialog-btn--danger  { background: #ef4444; color: #fff; }
 .pos-dialog-btn--danger:hover  { background: #dc2626; }
-
 .pos-dialog-btn--success { background: #10b981; color: #fff; }
 .pos-dialog-btn--success:hover { background: #059669; }
-
 .pos-dialog-btn--primary { background: #4f46e5; color: #fff; }
 .pos-dialog-btn--primary:hover { background: #4338ca; }
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+    .pos-main {
+        flex-direction: column;
+        height: auto;
+        overflow: visible;
+    }
+    .pos-title { font-size: 22px; }
+}

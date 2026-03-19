@@ -9,101 +9,131 @@
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    padding: 20px;
+    padding: 16px;
 }
 
 .payment-modal {
     background: white;
-    border-radius: 16px;
+    border-radius: 14px;
     width: 100%;
-    max-width: 600px;
-    max-height: 90vh;
+    max-width: 480px;
+    max-height: 94vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
 }
 
+/* ── Header ── */
 .payment-modal-header {
-    padding: 24px 30px;
-    border-bottom: 2px solid #e5e7eb;
+    padding: 12px 18px;
+    border-bottom: 1px solid #e5e7eb;
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: var(--gray-50);
+    flex-shrink: 0;
 }
 
 .payment-modal-header h2 {
     margin: 0;
-    font-size: 24px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--gray-900);
 }
 
-.payment-form {
-    padding: 30px;
-    overflow-y: auto;
-    flex: 1;
+.modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 6px;
+    transition: background 0.15s;
 }
 
+.modal-close:hover {
+    background: var(--gray-100);
+    color: var(--gray-800);
+}
+
+/* ── Form scroll area ── */
+.payment-form {
+    padding: 14px 18px 12px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+}
+
+/* ── Total ── */
 .payment-total-display {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px;
+    padding: 10px 14px;
     background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-    border-radius: 12px;
-    margin-bottom: 30px;
+    border-radius: 9px;
 }
 
 .payment-total-display span:first-child {
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 600;
     color: #1e40af;
 }
 
 .payment-total-amount {
-    font-size: 32px;
+    font-size: 22px;
     font-weight: 700;
     color: #1e3a8a;
 }
 
+/* ── Secciones ── */
 .payment-section {
-    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 .payment-label {
     display: block;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--gray-700);
-    margin-bottom: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
+/* ── Métodos de pago — 4 columnas compactas ── */
 .payment-methods {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
 }
 
 .payment-method-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 16px;
-    border: 2px solid #e5e7eb;
-    border-radius: 12px;
+    gap: 4px;
+    padding: 9px 6px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
     background: white;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 14px;
+    transition: all 0.15s ease;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--gray-700);
+    color: var(--gray-600);
+    line-height: 1.2;
 }
 
 .payment-method-btn svg {
-    font-size: 24px;
+    width: 17px;
+    height: 17px;
 }
 
 .payment-method-btn:hover {
@@ -121,14 +151,53 @@
     color: var(--primary-600);
 }
 
+/* ── Aviso gaveta ── */
+.pm-drawer-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 7px;
+    font-size: 12px;
+    color: #166534;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+/* ── Override altura inputs del componente Input ── */
+.payment-form input[type="text"],
+.payment-form input[type="number"] {
+    font-size: 13px !important;
+    padding: 7px 10px !important;
+    height: auto !important;
+    min-height: unset !important;
+}
+
+/* Labels del componente Input */
+.payment-form .input-label,
+.payment-form label {
+    font-size: 12px !important;
+}
+
+/* Helper text del componente Input */
+.payment-form .input-helper,
+.payment-form .helper-text,
+.payment-form small {
+    font-size: 11px !important;
+}
+
+/* ── Select documento ── */
 .payment-select {
     width: 100%;
-    padding: 12px;
+    padding: 7px 10px;
     border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 15px;
+    border-radius: 7px;
+    font-size: 13px;
     cursor: pointer;
-    margin-bottom: 12px;
+    background: white;
+    color: var(--gray-800);
 }
 
 .payment-select:focus {
@@ -137,35 +206,52 @@
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+/* ── Vuelto / falta ── */
 .change-display {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px;
+    padding: 7px 12px;
     background: #d1fae5;
-    border-radius: 8px;
-    margin-top: 12px;
+    border-radius: 7px;
+}
+
+.change-display.warning {
+    background: #fef3c7;
 }
 
 .change-display span:first-child {
+    font-size: 13px;
     font-weight: 600;
     color: #065f46;
 }
 
+.change-display.warning span:first-child {
+    color: #92400e;
+}
+
 .change-amount {
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
     color: #047857;
 }
 
+.change-display.warning .change-amount {
+    color: #b45309;
+}
+
+/* ── Textarea notas — altura fija pequeña ── */
 .payment-textarea {
     width: 100%;
-    padding: 12px;
+    padding: 7px 10px;
     border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 15px;
+    border-radius: 7px;
+    font-size: 13px;
     font-family: inherit;
-    resize: vertical;
+    resize: none;
+    height: 52px;
+    line-height: 1.4;
+    box-sizing: border-box;
 }
 
 .payment-textarea:focus {
@@ -174,25 +260,49 @@
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.payment-actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 30px;
+.char-counter {
+    font-size: 11px;
+    color: var(--gray-400);
+    text-align: right;
+    margin-top: 1px;
 }
 
+/* ── Acciones — botones compactos pero legibles ── */
+.payment-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
 
-/* Aviso de gaveta automática bajo los métodos de pago */
-.pm-drawer-hint {
+/* ── Acciones — botones compactos pero legibles ── */
+.payment-actions button,
+.payment-actions .btn,
+.payment-actions [class*="btn"] {
+    padding-top: 7px !important;
+    padding-bottom: 7px !important;
+    font-size: 15px !important;
+    min-height: unset !important;
+    height: auto !important;
+}
+
+/* ── Procesando ── */
+.processing-indicator {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 10px;
-    padding: 9px 13px;
-    background: #f0fdf4;
-    border: 1px solid #86efac;
-    border-radius: 8px;
-    font-size: 13px;
-    color: #166534;
+    padding: 8px 12px;
+    background: var(--primary-50);
+    border-radius: 7px;
+}
+
+.processing-indicator p {
+    font-size: 12px;
+    color: var(--primary-700);
+    margin: 0;
+}
+
+.error-text {
+    color: #ef4444;
+    font-size: 11px;
     font-weight: 500;
-    line-height: 1.4;
 }

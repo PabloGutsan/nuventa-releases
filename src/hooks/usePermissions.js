@@ -9,17 +9,17 @@ import { useAuth } from '../context/AuthContext';
 // ── Tabla de permisos por rol ─────────────────────────────────────────────────
 const ROLE_PERMISSIONS = {
     admin: {
-        sections: ['dashboard', 'pos', 'ventas', 'products', 'compras', 'suppliers', 'customers', 'reports', 'caja', 'users', 'settings'],
+        sections: ['dashboard', 'pos', 'ventas', 'products', 'compras', 'suppliers', 'promotions', 'customers', 'reports', 'caja', 'users', 'settings'],
         defaultSection: 'dashboard',
         salesFilter: 'all',      // ve todas las ventas
     },
     vendedor: {
-        sections: ['dashboard', 'pos', 'ventas'],
+        sections: ['dashboard', 'pos', 'ventas', 'promotions'],
         defaultSection: 'pos',
         salesFilter: 'own',      // solo sus ventas del día
     },
     inventario: {
-        sections: ['products', 'compras', 'suppliers'],
+        sections: ['products', 'compras', 'suppliers', 'promotions'],
         defaultSection: 'products',
         salesFilter: 'none',
     },

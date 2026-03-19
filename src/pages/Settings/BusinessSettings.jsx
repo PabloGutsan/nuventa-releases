@@ -99,43 +99,51 @@ const BusinessSettings = ({ onNavigate }) => {
     const [errorMsg,       setErrorMsg]       = useState('');
     const [fieldErrors,    setFieldErrors]    = useState({});
 
-    // ── Configuración de impresora de tickets ────────────────────────────────
-    // Si está configurada, el ticket se imprime silenciosamente sin diálogo del SO.
-    const [ticketPrinter,  setTicketPrinter]  = useState('');
-    const [savedTicket,    setSavedTicket]    = useState(null);
+    // ── Impresora de tickets ──────────────────────────────────────────────────
+    const [ticketPrinter, setTicketPrinter] = useState('');
+    const [savedTicket,   setSavedTicket]   = useState(null);
 
-    // ── Configuración de cocina ───────────────────────────────────────────────
-    // kitchenCopyDest valores posibles:
-    //   1 copia:  'kitchen' (→ impresora cocina) | 'cajero' (→ junto con ticket)
-    //   2 copias: 'both_kitchen' (→ 2 a cocina)  | 'split' (→ 1 cocina + 1 cajero) | 'both_cajero' (→ 2 al cajero)
+    // ── Cocina ────────────────────────────────────────────────────────────────
     const [kitchenEnabled,    setKitchenEnabled]    = useState(false);
     const [kitchenCopies,     setKitchenCopies]     = useState(1);
     const [kitchenPrinter,    setKitchenPrinter]    = useState('');
     const [kitchenCopyDest,   setKitchenCopyDest]   = useState('kitchen');
     const [availablePrinters, setAvailablePrinters] = useState([]);
 
-    // ── Configuración de caja ─────────────────────────────────────────────────
+    // ── Caja ──────────────────────────────────────────────────────────────────
     const [cashLimitAlert,       setCashLimitAlert]       = useState('350.000');
     const [cashWithdrawalAmount, setCashWithdrawalAmount] = useState('300.000');
+
+    // ── Descuentos y promociones  [v2.2] ──────────────────────────────────────
+    const [promoEnabled,         setPromoEnabled]         = useState(true);
+    const [discItemEnabled,      setDiscItemEnabled]      = useState(true);
+    const [discGlobalEnabled,    setDiscGlobalEnabled]    = useState(true);
+    const [discMaxPercent,       setDiscMaxPercent]       = useState('100');
+    const [savedDiscount,        setSavedDiscount]        = useState(null);
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
     const [dialog, setDialog] = useState(null);
 
     // ── Detectar cambios sin guardar ──────────────────────────────────────────
     const hasUnsavedChanges = useCallback(() => {
-        if (!savedData || !savedKitchen || !savedCash || !savedTicket) return false;
-        const formChanged    = JSON.stringify(formData) !== JSON.stringify(savedData);
-        const ticketChanged  = ticketPrinter !== savedTicket.printer;
-        const kitchenChanged = kitchenEnabled  !== savedKitchen.enabled
-                            || kitchenCopies   !== savedKitchen.copies
-                            || kitchenPrinter  !== savedKitchen.printer
-                            || kitchenCopyDest !== savedKitchen.copyDest;
-        const cashChanged    = parseCLP(cashLimitAlert)       !== savedCash.limit
-                            || parseCLP(cashWithdrawalAmount) !== savedCash.withdrawal;
-        return formChanged || ticketChanged || kitchenChanged || cashChanged;
+        if (!savedData || !savedKitchen || !savedCash || !savedTicket || !savedDiscount) return false;
+        const formChanged     = JSON.stringify(formData) !== JSON.stringify(savedData);
+        const ticketChanged   = ticketPrinter !== savedTicket.printer;
+        const kitchenChanged  = kitchenEnabled  !== savedKitchen.enabled
+                             || kitchenCopies   !== savedKitchen.copies
+                             || kitchenPrinter  !== savedKitchen.printer
+                             || kitchenCopyDest !== savedKitchen.copyDest;
+        const cashChanged     = parseCLP(cashLimitAlert)       !== savedCash.limit
+                             || parseCLP(cashWithdrawalAmount) !== savedCash.withdrawal;
+        const discountChanged = promoEnabled      !== savedDiscount.promoEnabled
+                             || discItemEnabled   !== savedDiscount.itemEnabled
+                             || discGlobalEnabled !== savedDiscount.globalEnabled
+                             || discMaxPercent    !== savedDiscount.maxPercent;
+        return formChanged || ticketChanged || kitchenChanged || cashChanged || discountChanged;
     }, [formData, savedData, ticketPrinter, savedTicket,
         kitchenEnabled, kitchenCopies, kitchenPrinter, kitchenCopyDest,
-        savedKitchen, cashLimitAlert, cashWithdrawalAmount, savedCash]);
+        savedKitchen, cashLimitAlert, cashWithdrawalAmount, savedCash,
+        promoEnabled, discItemEnabled, discGlobalEnabled, discMaxPercent, savedDiscount]);
 
     // ── Interceptor de navegación ─────────────────────────────────────────────
     useEffect(() => {
@@ -149,7 +157,6 @@ const BusinessSettings = ({ onNavigate }) => {
         return () => { delete window.__requestNavigate; };
     }, [hasUnsavedChanges, onNavigate]);
 
-    // ── Carga inicial ─────────────────────────────────────────────────────────
     useEffect(() => { loadBusinessInfo(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
@@ -165,7 +172,7 @@ const BusinessSettings = ({ onNavigate }) => {
         return () => window.removeEventListener('keydown', onKey);
     }, [dialog]);
 
-    // ── Cargar lista de impresoras ────────────────────────────────────────────
+    // ── Cargar impresoras ─────────────────────────────────────────────────────
     const loadPrinters = async () => {
         try {
             const printers = await window.electronAPI.kitchen.getPrinters();
@@ -175,19 +182,27 @@ const BusinessSettings = ({ onNavigate }) => {
         }
     };
 
+    // ── Carga inicial ─────────────────────────────────────────────────────────
     const loadBusinessInfo = async () => {
         try {
             setInitialLoading(true);
 
-            await window.electronAPI.database.run(
-                `INSERT OR IGNORE INTO system_settings (key, value, description, data_type)
-                 VALUES ('cash_limit_alert', '350000', 'Límite de alerta de efectivo en caja', 'number')`
-            );
-            await window.electronAPI.database.run(
-                `INSERT OR IGNORE INTO system_settings (key, value, description, data_type)
-                 VALUES ('cash_withdrawal_amount', '300000', 'Monto sugerido de retiro de caja', 'number')`
-            );
+            // Asegurar settings base en BD
+            const ensureSettings = [
+                `('cash_limit_alert',               '350000', 'Límite de alerta de efectivo en caja',              'number')`,
+                `('cash_withdrawal_amount',          '300000', 'Monto sugerido de retiro de caja',                  'number')`,
+                `('promotions_enabled',              '1',      'Activar promociones automáticas en el POS',         'boolean')`,
+                `('discount_manual_item_enabled',    '1',      'Permitir descuento manual por producto en carrito', 'boolean')`,
+                `('discount_manual_global_enabled',  '1',      'Permitir descuento global manual en el carrito',    'boolean')`,
+                `('discount_max_percent',            '100',    'Límite máximo de descuento permitido (%)',          'number')`,
+            ];
+            for (const vals of ensureSettings) {
+                await window.electronAPI.database.run(
+                    `INSERT OR IGNORE INTO system_settings (key, value, description, data_type) VALUES ${vals}`
+                );
+            }
 
+            // Info del negocio
             const info   = await businessRepo.getBusinessInfo();
             const loaded = makeEmpty();
             if (info && typeof info === 'object') {
@@ -210,25 +225,19 @@ const BusinessSettings = ({ onNavigate }) => {
             setFormData(loaded);
             setSavedData({ ...loaded });
 
-            // Impresora de tickets
-            const ticketPrinterResult = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'ticket_printer'`);
-            const tp = ticketPrinterResult?.value || '';
+            // Ticket
+            const ticketRow = await window.electronAPI.database.get(
+                `SELECT value FROM system_settings WHERE key = 'ticket_printer'`
+            );
+            const tp = ticketRow?.value || '';
             setTicketPrinter(tp);
             setSavedTicket({ printer: tp });
 
             // Cocina
-            const kitchenResult  = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_enabled'`);
-            const copiesResult   = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_copies'`);
-            const printerResult  = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_printer'`);
-            const copyDestResult = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_copy_dest'`);
-
-            const ke = kitchenResult?.value === '1';
-            const kc = parseInt(copiesResult?.value || '1');
-            const kp = printerResult?.value || '';
-            // Normalizar el valor guardado: si viene 'both_kitchen' con kc=1, usar 'kitchen'
-            const rawDest = copyDestResult?.value || '';
-            const kd = rawDest || (kc === 1 ? 'kitchen' : 'both_kitchen');
-
+            const ke  = (await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_enabled'`))?.value === '1';
+            const kc  = parseInt((await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_copies'`))?.value || '1');
+            const kp  = (await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_printer'`))?.value || '';
+            const kd  = (await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'kitchen_copy_dest'`))?.value || (kc === 1 ? 'kitchen' : 'both_kitchen');
             setKitchenEnabled(ke);
             setKitchenCopies(kc);
             setKitchenPrinter(kp);
@@ -238,13 +247,22 @@ const BusinessSettings = ({ onNavigate }) => {
             await loadPrinters();
 
             // Caja
-            const limitResult      = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'cash_limit_alert'`);
-            const withdrawalResult = await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'cash_withdrawal_amount'`);
-            const cl = parseInt(limitResult?.value      || '350000');
-            const cw = parseInt(withdrawalResult?.value || '300000');
+            const cl = parseInt((await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'cash_limit_alert'`))?.value || '350000');
+            const cw = parseInt((await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'cash_withdrawal_amount'`))?.value || '300000');
             setCashLimitAlert(cl.toLocaleString('es-CL'));
             setCashWithdrawalAmount(cw.toLocaleString('es-CL'));
             setSavedCash({ limit: cl, withdrawal: cw });
+
+            // Descuentos y promociones
+            const pe  = (await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'promotions_enabled'`))?.value !== '0';
+            const die = (await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'discount_manual_item_enabled'`))?.value !== '0';
+            const dge = (await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'discount_manual_global_enabled'`))?.value !== '0';
+            const dmp = (await window.electronAPI.database.get(`SELECT value FROM system_settings WHERE key = 'discount_max_percent'`))?.value || '100';
+            setPromoEnabled(pe);
+            setDiscItemEnabled(die);
+            setDiscGlobalEnabled(dge);
+            setDiscMaxPercent(dmp);
+            setSavedDiscount({ promoEnabled: pe, itemEnabled: die, globalEnabled: dge, maxPercent: dmp });
 
         } catch (error) {
             console.error('Error loading:', error);
@@ -254,18 +272,15 @@ const BusinessSettings = ({ onNavigate }) => {
         }
     };
 
-    // ── Helpers errores ───────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
     const setFieldError   = (field, msg) => setFieldErrors(prev => ({ ...prev, [field]: msg }));
     const clearFieldError = (field)      => setFieldErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
 
-    // ── Handler cambio de copias — resetea copyDest al default del modo ───────
     const handleSetCopies = (n) => {
         setKitchenCopies(n);
-        // Reset al default de cada modo para evitar estados inválidos
         setKitchenCopyDest(n === 1 ? 'kitchen' : 'both_kitchen');
     };
 
-    // ── Handlers formulario ───────────────────────────────────────────────────
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -313,14 +328,8 @@ const BusinessSettings = ({ onNavigate }) => {
         if (errorMsg) setErrorMsg('');
     };
 
-    const handleCashLimitChange = (e) => {
-        setCashLimitAlert(formatCLP(e.target.value));
-        if (errorMsg) setErrorMsg('');
-    };
-    const handleCashWithdrawalChange = (e) => {
-        setCashWithdrawalAmount(formatCLP(e.target.value));
-        if (errorMsg) setErrorMsg('');
-    };
+    const handleCashLimitChange      = (e) => { setCashLimitAlert(formatCLP(e.target.value));       if (errorMsg) setErrorMsg(''); };
+    const handleCashWithdrawalChange = (e) => { setCashWithdrawalAmount(formatCLP(e.target.value)); if (errorMsg) setErrorMsg(''); };
 
     const handleLogoClick  = () => fileInputRef.current?.click();
     const handleLogoChange = (e) => {
@@ -364,6 +373,9 @@ const BusinessSettings = ({ onNavigate }) => {
             errors.cashWithdrawalAmount = 'El monto de retiro debe ser mayor a $0';
         if (withdrawal >= limit)
             errors.cashWithdrawalAmount = 'El monto de retiro debe ser menor al límite de alerta';
+        const maxPct = parseInt(discMaxPercent);
+        if (isNaN(maxPct) || maxPct < 1 || maxPct > 100)
+            errors.discMaxPercent = 'Debe ser un valor entre 1 y 100';
         return errors;
     };
 
@@ -392,7 +404,7 @@ const BusinessSettings = ({ onNavigate }) => {
                 city:           formData.city   || null,
             });
 
-            // Impresora de tickets
+            // Ticket
             await window.electronAPI.database.run(
                 `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
                  VALUES ('ticket_printer', ?, 'Impresora de tickets (silenciosa)', 'string')`,
@@ -400,26 +412,18 @@ const BusinessSettings = ({ onNavigate }) => {
             );
 
             // Cocina
-            await window.electronAPI.database.run(
-                `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
-                 VALUES ('kitchen_enabled', ?, 'Activar comanda para cocina', 'boolean')`,
-                [kitchenEnabled ? '1' : '0']
-            );
-            await window.electronAPI.database.run(
-                `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
-                 VALUES ('kitchen_copies', ?, 'Cantidad de copias de comanda', 'number')`,
-                [String(kitchenCopies)]
-            );
-            await window.electronAPI.database.run(
-                `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
-                 VALUES ('kitchen_printer', ?, 'Impresora de cocina', 'string')`,
-                [kitchenPrinter]
-            );
-            await window.electronAPI.database.run(
-                `INSERT OR REPLACE INTO system_settings (key, value, description, data_type)
-                 VALUES ('kitchen_copy_dest', ?, 'Destino de copias de comanda', 'string')`,
-                [kitchenCopyDest]
-            );
+            const kitchenSettings = [
+                ['kitchen_enabled',    kitchenEnabled ? '1' : '0', 'Activar comanda para cocina',    'boolean'],
+                ['kitchen_copies',     String(kitchenCopies),       'Cantidad de copias de comanda',  'number'],
+                ['kitchen_printer',    kitchenPrinter,              'Impresora de cocina',            'string'],
+                ['kitchen_copy_dest',  kitchenCopyDest,             'Destino de copias de comanda',   'string'],
+            ];
+            for (const [key, value, desc, type] of kitchenSettings) {
+                await window.electronAPI.database.run(
+                    `INSERT OR REPLACE INTO system_settings (key, value, description, data_type) VALUES (?, ?, ?, ?)`,
+                    [key, value, desc, type]
+                );
+            }
 
             // Caja
             const limitVal      = parseCLP(cashLimitAlert);
@@ -435,10 +439,31 @@ const BusinessSettings = ({ onNavigate }) => {
                 [String(withdrawalVal)]
             );
 
+            // Descuentos y promociones
+            const discountSettings = [
+                ['promotions_enabled',             promoEnabled      ? '1' : '0', 'Activar promociones automáticas en el POS',         'boolean'],
+                ['discount_manual_item_enabled',   discItemEnabled   ? '1' : '0', 'Permitir descuento manual por producto en carrito',  'boolean'],
+                ['discount_manual_global_enabled', discGlobalEnabled ? '1' : '0', 'Permitir descuento global manual en el carrito',     'boolean'],
+                ['discount_max_percent',           String(parseInt(discMaxPercent) || 100), 'Límite máximo de descuento permitido (%)', 'number'],
+            ];
+            for (const [key, value, desc, type] of discountSettings) {
+                await window.electronAPI.database.run(
+                    `INSERT OR REPLACE INTO system_settings (key, value, description, data_type) VALUES (?, ?, ?, ?)`,
+                    [key, value, desc, type]
+                );
+            }
+
+            // Actualizar estado "guardado"
             setSavedData({ ...formData });
             setSavedTicket({ printer: ticketPrinter });
             setSavedKitchen({ enabled: kitchenEnabled, copies: kitchenCopies, printer: kitchenPrinter, copyDest: kitchenCopyDest });
             setSavedCash({ limit: limitVal, withdrawal: withdrawalVal });
+            setSavedDiscount({
+                promoEnabled,
+                itemEnabled:   discItemEnabled,
+                globalEnabled: discGlobalEnabled,
+                maxPercent:    String(parseInt(discMaxPercent) || 100),
+            });
             return true;
         } catch (error) {
             console.error('Error saving:', error);
@@ -468,7 +493,7 @@ const BusinessSettings = ({ onNavigate }) => {
         if (dest && onNavigate) onNavigate(dest);
     };
 
-    // ── Texto de vista previa del comportamiento ──────────────────────────────
+    // ── Vista previa cocina ───────────────────────────────────────────────────
     const getBehaviorPreview = () => {
         if (!kitchenPrinter) {
             return 'Al finalizar la venta, aparecerá el diálogo de impresión para elegir la impresora manualmente.';
@@ -478,7 +503,6 @@ const BusinessSettings = ({ onNavigate }) => {
                 return `1 comanda saldrá junto con el ticket en el cajero al imprimir.`;
             return `1 comanda se enviará automáticamente a "${kitchenPrinter}" al imprimir el ticket.`;
         }
-        // 2 copias
         if (kitchenCopyDest === 'both_cajero')
             return `2 comandas saldrán junto con el ticket en el cajero al imprimir.`;
         if (kitchenCopyDest === 'split')
@@ -690,16 +714,14 @@ const BusinessSettings = ({ onNavigate }) => {
                         </div>
                     </Card>
 
-                    {/* ── Personalización del Ticket ── */}
+                    {/* ── Ticket de Venta ── */}
                     <Card title="🧾 Ticket de Venta">
-                        {/* Impresora de tickets */}
                         <div className="kitchen-setting-row">
                             <div className="setting-toggle-info">
                                 <p className="setting-toggle-title">Impresora de tickets</p>
                                 <p className="setting-toggle-desc">
                                     El ticket se enviará automáticamente a esta impresora al finalizar la venta,
-                                    sin mostrar el diálogo del sistema. Si no seleccionas una, se abrirá el
-                                    diálogo de impresión normal.
+                                    sin mostrar el diálogo del sistema.
                                 </p>
                             </div>
                             <div className="kitchen-printer-select-wrap">
@@ -708,30 +730,23 @@ const BusinessSettings = ({ onNavigate }) => {
                                     value={ticketPrinter}
                                     onChange={(e) => {
                                         const val = e.target.value;
-                                        if (val && val === kitchenPrinter) return; // bloquear misma impresora
+                                        if (val && val === kitchenPrinter) return;
                                         setTicketPrinter(val);
                                     }}
                                     disabled={loading}
                                 >
                                     <option value="">— Diálogo manual (por defecto) —</option>
                                     {availablePrinters.map(p => (
-                                        <option
-                                            key={p.name}
-                                            value={p.name}
-                                            disabled={kitchenPrinter && p.name === kitchenPrinter}
-                                        >
+                                        <option key={p.name} value={p.name}
+                                            disabled={kitchenPrinter && p.name === kitchenPrinter}>
                                             {p.isDefault ? `⭐ ${p.name}` : p.name}
                                             {kitchenPrinter && p.name === kitchenPrinter ? ' (en uso por cocina)' : ''}
                                         </option>
                                     ))}
                                 </select>
-                                <button
-                                    type="button"
-                                    className="kitchen-refresh-btn"
-                                    onClick={loadPrinters}
-                                    disabled={loading}
-                                    title="Actualizar lista de impresoras"
-                                >
+                                <button type="button" className="kitchen-refresh-btn"
+                                    onClick={loadPrinters} disabled={loading}
+                                    title="Actualizar lista de impresoras">
                                     <FiRefreshCw size={14} />
                                 </button>
                             </div>
@@ -741,12 +756,11 @@ const BusinessSettings = ({ onNavigate }) => {
                             <div className="kitchen-behavior-preview">
                                 <span className="kitchen-preview-icon">👁️</span>
                                 <span className="kitchen-preview-text">
-                                    El ticket se enviará automáticamente a <strong>{ticketPrinter}</strong> al imprimir, sin ningún diálogo.
+                                    El ticket se enviará automáticamente a <strong>{ticketPrinter}</strong> al imprimir.
                                 </span>
                             </div>
                         )}
 
-                        {/* Mensaje de agradecimiento */}
                         <div className="form-field" style={{ marginTop: ticketPrinter ? '16px' : '0' }}>
                             <label className="form-label">Mensaje de Agradecimiento</label>
                             <textarea
@@ -764,8 +778,6 @@ const BusinessSettings = ({ onNavigate }) => {
 
                     {/* ── Comanda para Cocina ── */}
                     <Card title="🍽️ Comanda para Cocina">
-
-                        {/* 1 — Toggle activar comanda */}
                         <div className="setting-toggle-row">
                             <div className="setting-toggle-info">
                                 <p className="setting-toggle-title">Activar impresión de comanda</p>
@@ -783,13 +795,10 @@ const BusinessSettings = ({ onNavigate }) => {
 
                         {kitchenEnabled && (
                             <>
-                                {/* 2 — Copias de comanda */}
                                 <div className="kitchen-copies-row">
                                     <div className="setting-toggle-info">
                                         <p className="setting-toggle-title">Copias de comanda</p>
-                                        <p className="setting-toggle-desc">
-                                            ¿Cuántas comandas imprimir por venta?
-                                        </p>
+                                        <p className="setting-toggle-desc">¿Cuántas comandas imprimir por venta?</p>
                                     </div>
                                     <div className="copies-selector">
                                         <button type="button"
@@ -805,39 +814,25 @@ const BusinessSettings = ({ onNavigate }) => {
                                     </div>
                                 </div>
 
-                                {/* 3 — Destino de la(s) copia(s)
-                                    Visible siempre que hay impresora configurada.
-                                    Para 1 copia: kitchen | cajero
-                                    Para 2 copias: both_kitchen | split | both_cajero        */}
                                 {kitchenPrinter && kitchenCopies === 1 && (
                                     <div className="kitchen-copies-dest-row">
                                         <div className="setting-toggle-info">
                                             <p className="setting-toggle-title">Destino de la comanda</p>
-                                            <p className="setting-toggle-desc">
-                                                ¿Dónde debe aparecer la comanda al imprimir el ticket?
-                                            </p>
+                                            <p className="setting-toggle-desc">¿Dónde debe aparecer la comanda?</p>
                                         </div>
                                         <div className="copies-dest-selector">
-                                            <button
-                                                type="button"
-                                                className={`copy-dest-btn ${kitchenCopyDest === 'kitchen' ? 'copy-dest-btn--active' : ''}`}
-                                                onClick={() => setKitchenCopyDest('kitchen')}
-                                                disabled={loading}
-                                            >
-                                                <span className="copy-dest-icon">🍳</span>
-                                                <span className="copy-dest-label">A la cocina</span>
-                                                <span className="copy-dest-desc">Se envía automáticamente a la impresora de cocina</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={`copy-dest-btn ${kitchenCopyDest === 'cajero' ? 'copy-dest-btn--active' : ''}`}
-                                                onClick={() => setKitchenCopyDest('cajero')}
-                                                disabled={loading}
-                                            >
-                                                <span className="copy-dest-icon">🧾</span>
-                                                <span className="copy-dest-label">Al cajero</span>
-                                                <span className="copy-dest-desc">Sale junto con el ticket en el diálogo de impresión</span>
-                                            </button>
+                                            {[
+                                                { val: 'kitchen', icon: '🍳', label: 'A la cocina',  desc: 'Se envía automáticamente a la impresora de cocina' },
+                                                { val: 'cajero',  icon: '🧾', label: 'Al cajero',    desc: 'Sale junto con el ticket en el diálogo de impresión' },
+                                            ].map(opt => (
+                                                <button key={opt.val} type="button"
+                                                    className={`copy-dest-btn ${kitchenCopyDest === opt.val ? 'copy-dest-btn--active' : ''}`}
+                                                    onClick={() => setKitchenCopyDest(opt.val)} disabled={loading}>
+                                                    <span className="copy-dest-icon">{opt.icon}</span>
+                                                    <span className="copy-dest-label">{opt.label}</span>
+                                                    <span className="copy-dest-desc">{opt.desc}</span>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
@@ -846,55 +841,31 @@ const BusinessSettings = ({ onNavigate }) => {
                                     <div className="kitchen-copies-dest-row">
                                         <div className="setting-toggle-info">
                                             <p className="setting-toggle-title">Destino de las 2 copias</p>
-                                            <p className="setting-toggle-desc">
-                                                Define a dónde va cada copia de la comanda.
-                                            </p>
+                                            <p className="setting-toggle-desc">Define a dónde va cada copia.</p>
                                         </div>
                                         <div className="copies-dest-selector">
-                                            <button
-                                                type="button"
-                                                className={`copy-dest-btn ${kitchenCopyDest === 'both_kitchen' ? 'copy-dest-btn--active' : ''}`}
-                                                onClick={() => setKitchenCopyDest('both_kitchen')}
-                                                disabled={loading}
-                                            >
-                                                <span className="copy-dest-icon">🍳🍳</span>
-                                                <span className="copy-dest-label">Ambas a cocina</span>
-                                                <span className="copy-dest-desc">Las 2 van automáticamente a la impresora de cocina</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={`copy-dest-btn ${kitchenCopyDest === 'split' ? 'copy-dest-btn--active' : ''}`}
-                                                onClick={() => setKitchenCopyDest('split')}
-                                                disabled={loading}
-                                            >
-                                                <span className="copy-dest-icon">🍳🧾</span>
-                                                <span className="copy-dest-label">Una a cocina + una al cajero</span>
-                                                <span className="copy-dest-desc">1 va automática a cocina, 1 sale con el ticket del cajero</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={`copy-dest-btn ${kitchenCopyDest === 'both_cajero' ? 'copy-dest-btn--active' : ''}`}
-                                                onClick={() => setKitchenCopyDest('both_cajero')}
-                                                disabled={loading}
-                                            >
-                                                <span className="copy-dest-icon">🧾🧾</span>
-                                                <span className="copy-dest-label">Ambas al cajero</span>
-                                                <span className="copy-dest-desc">Las 2 salen junto con el ticket en el diálogo de impresión</span>
-                                            </button>
+                                            {[
+                                                { val: 'both_kitchen', icon: '🍳🍳', label: 'Ambas a cocina',           desc: 'Las 2 van automáticamente a la impresora de cocina' },
+                                                { val: 'split',        icon: '🍳🧾', label: 'Una a cocina + una cajero', desc: '1 va a cocina, 1 sale con el ticket del cajero' },
+                                                { val: 'both_cajero',  icon: '🧾🧾', label: 'Ambas al cajero',           desc: 'Las 2 salen junto con el ticket del cajero' },
+                                            ].map(opt => (
+                                                <button key={opt.val} type="button"
+                                                    className={`copy-dest-btn ${kitchenCopyDest === opt.val ? 'copy-dest-btn--active' : ''}`}
+                                                    onClick={() => setKitchenCopyDest(opt.val)} disabled={loading}>
+                                                    <span className="copy-dest-icon">{opt.icon}</span>
+                                                    <span className="copy-dest-label">{opt.label}</span>
+                                                    <span className="copy-dest-desc">{opt.desc}</span>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* 4 — Impresora de cocina
-                                    Va después del destino porque el selector de destino
-                                    solo aparece cuando hay impresora — esto crea el flujo:
-                                    copias → (si hay printer) destino → printer        */}
                                 <div className="kitchen-setting-row">
                                     <div className="setting-toggle-info">
                                         <p className="setting-toggle-title">Impresora de cocina</p>
                                         <p className="setting-toggle-desc">
                                             La comanda se enviará automáticamente a esta impresora al finalizar la venta.
-                                            Si no seleccionas una, aparecerá el diálogo de impresión normal.
                                         </p>
                                     </div>
                                     <div className="kitchen-printer-select-wrap">
@@ -910,34 +881,24 @@ const BusinessSettings = ({ onNavigate }) => {
                                         >
                                             <option value="">— Sin impresora automática —</option>
                                             {availablePrinters.map(p => (
-                                                <option
-                                                    key={p.name}
-                                                    value={p.name}
-                                                    disabled={ticketPrinter && p.name === ticketPrinter}
-                                                >
+                                                <option key={p.name} value={p.name}
+                                                    disabled={ticketPrinter && p.name === ticketPrinter}>
                                                     {p.isDefault ? `⭐ ${p.name}` : p.name}
                                                     {ticketPrinter && p.name === ticketPrinter ? ' (en uso por tickets)' : ''}
                                                 </option>
                                             ))}
                                         </select>
-                                        <button
-                                            type="button"
-                                            className="kitchen-refresh-btn"
-                                            onClick={loadPrinters}
-                                            disabled={loading}
-                                            title="Actualizar lista de impresoras"
-                                        >
+                                        <button type="button" className="kitchen-refresh-btn"
+                                            onClick={loadPrinters} disabled={loading}
+                                            title="Actualizar lista de impresoras">
                                             <FiRefreshCw size={14} />
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* 5 — Vista previa del comportamiento */}
                                 <div className="kitchen-behavior-preview">
                                     <span className="kitchen-preview-icon">👁️</span>
-                                    <span className="kitchen-preview-text">
-                                        {getBehaviorPreview()}
-                                    </span>
+                                    <span className="kitchen-preview-text">{getBehaviorPreview()}</span>
                                 </div>
                             </>
                         )}
@@ -947,19 +908,15 @@ const BusinessSettings = ({ onNavigate }) => {
                     <Card title="💵 Control de Efectivo en Caja">
                         <p className="bs-section-desc">
                             Define cuándo alertar al cajero que hay demasiado efectivo en caja y cuánto debe retirar.
-                            Esto reduce el riesgo de pérdida y facilita el arqueo final.
                         </p>
                         <div className="form-grid">
                             <div className="bs-field-wrap">
                                 <label className="bs-field-label">Límite de alerta de efectivo</label>
                                 <div className="bs-field-prefix-wrap">
                                     <span className="bs-field-prefix">$</span>
-                                    <input
-                                        type="text"
-                                        value={cashLimitAlert}
+                                    <input type="text" value={cashLimitAlert}
                                         onChange={handleCashLimitChange}
-                                        placeholder="350.000"
-                                        disabled={loading}
+                                        placeholder="350.000" disabled={loading}
                                         inputMode="numeric"
                                         className={`bs-field-input bs-field-input--prefixed ${fieldErrors.cashLimitAlert ? 'bs-field-input--error' : ''}`}
                                     />
@@ -967,19 +924,16 @@ const BusinessSettings = ({ onNavigate }) => {
                                 {fieldErrors.cashLimitAlert ? (
                                     <small className="bs-field-helper bs-field-error">⚠️ {fieldErrors.cashLimitAlert}</small>
                                 ) : (
-                                    <small className="bs-field-helper">Cuando la caja supere este monto aparecerá una alerta de retiro</small>
+                                    <small className="bs-field-helper">Cuando la caja supere este monto aparecerá una alerta</small>
                                 )}
                             </div>
                             <div className="bs-field-wrap">
                                 <label className="bs-field-label">Monto sugerido de retiro</label>
                                 <div className="bs-field-prefix-wrap">
                                     <span className="bs-field-prefix">$</span>
-                                    <input
-                                        type="text"
-                                        value={cashWithdrawalAmount}
+                                    <input type="text" value={cashWithdrawalAmount}
                                         onChange={handleCashWithdrawalChange}
-                                        placeholder="300.000"
-                                        disabled={loading}
+                                        placeholder="300.000" disabled={loading}
                                         inputMode="numeric"
                                         className={`bs-field-input bs-field-input--prefixed ${fieldErrors.cashWithdrawalAmount ? 'bs-field-input--error' : ''}`}
                                     />
@@ -987,7 +941,7 @@ const BusinessSettings = ({ onNavigate }) => {
                                 {fieldErrors.cashWithdrawalAmount ? (
                                     <small className="bs-field-helper bs-field-error">⚠️ {fieldErrors.cashWithdrawalAmount}</small>
                                 ) : (
-                                    <small className="bs-field-helper">Monto a retirar al admin, dejando el resto como fondo de vuelto</small>
+                                    <small className="bs-field-helper">Monto a retirar dejando el resto como fondo de vuelto</small>
                                 )}
                             </div>
                         </div>
@@ -1008,6 +962,123 @@ const BusinessSettings = ({ onNavigate }) => {
                         )}
                     </Card>
 
+                    {/* ── Ventas y Descuentos  [v2.2] ── */}
+                    <Card title="🏷️ Ventas y Descuentos">
+                        <p className="bs-section-desc">
+                            Controla qué tipos de descuentos puede aplicar el cajero durante una venta
+                            y si el sistema aplica promociones automáticamente.
+                        </p>
+
+                        {/* Toggle: Promociones automáticas */}
+                        <div className="setting-toggle-row">
+                            <div className="setting-toggle-info">
+                                <p className="setting-toggle-title">Promociones automáticas</p>
+                                <p className="setting-toggle-desc">
+                                    El POS detectará y aplicará automáticamente las promociones activas
+                                    al agregar productos al carrito (descuentos por producto, categoría, packs y montos mínimos).
+                                </p>
+                            </div>
+                            <label className="toggle-switch">
+                                <input type="checkbox" checked={promoEnabled}
+                                    onChange={(e) => setPromoEnabled(e.target.checked)}
+                                    disabled={loading} />
+                                <span className="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div className="bs-divider" />
+
+                        {/* Toggle: Descuento manual por producto */}
+                        <div className="setting-toggle-row">
+                            <div className="setting-toggle-info">
+                                <p className="setting-toggle-title">Descuento manual por producto</p>
+                                <p className="setting-toggle-desc">
+                                    Permite al cajero ingresar un descuento en monto o porcentaje
+                                    sobre cada producto del carrito de forma individual.
+                                </p>
+                            </div>
+                            <label className="toggle-switch">
+                                <input type="checkbox" checked={discItemEnabled}
+                                    onChange={(e) => setDiscItemEnabled(e.target.checked)}
+                                    disabled={loading} />
+                                <span className="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div className="bs-divider" />
+
+                        {/* Toggle: Descuento global al total */}
+                        <div className="setting-toggle-row">
+                            <div className="setting-toggle-info">
+                                <p className="setting-toggle-title">Descuento global al total</p>
+                                <p className="setting-toggle-desc">
+                                    Permite al cajero aplicar un descuento en monto o porcentaje
+                                    sobre el total del carrito completo.
+                                </p>
+                            </div>
+                            <label className="toggle-switch">
+                                <input type="checkbox" checked={discGlobalEnabled}
+                                    onChange={(e) => setDiscGlobalEnabled(e.target.checked)}
+                                    disabled={loading} />
+                                <span className="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        {/* Límite máximo de descuento — solo visible si algún descuento manual está activo */}
+                        {(discItemEnabled || discGlobalEnabled) && (
+                            <>
+                                <div className="bs-divider" />
+                                <div className="kitchen-setting-row" style={{ alignItems: 'flex-start' }}>
+                                    <div className="setting-toggle-info">
+                                        <p className="setting-toggle-title">Límite máximo de descuento</p>
+                                        <p className="setting-toggle-desc">
+                                            Porcentaje máximo que el cajero puede descontar sobre cualquier
+                                            producto o sobre el total del carrito. Usa 100 para no poner límite.
+                                        </p>
+                                    </div>
+                                    <div className="bs-field-wrap" style={{ minWidth: '140px', maxWidth: '160px' }}>
+                                        <div className="bs-field-prefix-wrap">
+                                            <input
+                                                type="number"
+                                                value={discMaxPercent}
+                                                onChange={(e) => {
+                                                    setDiscMaxPercent(e.target.value);
+                                                    clearFieldError('discMaxPercent');
+                                                }}
+                                                min="1" max="100"
+                                                placeholder="100"
+                                                disabled={loading}
+                                                className={`bs-field-input bs-field-input--prefixed ${fieldErrors.discMaxPercent ? 'bs-field-input--error' : ''}`}
+                                                style={{ textAlign: 'right' }}
+                                            />
+                                            <span className="bs-field-suffix">%</span>
+                                        </div>
+                                        {fieldErrors.discMaxPercent ? (
+                                            <small className="bs-field-helper bs-field-error">⚠️ {fieldErrors.discMaxPercent}</small>
+                                        ) : (
+                                            <small className="bs-field-helper">1% – 100%</small>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Vista previa del comportamiento */}
+                        <div className="kitchen-behavior-preview" style={{ marginTop: '12px' }}>
+                            <span className="kitchen-preview-icon">👁️</span>
+                            <span className="kitchen-preview-text">
+                                {!promoEnabled && !discItemEnabled && !discGlobalEnabled
+                                    ? 'El cajero no podrá aplicar ningún descuento manual ni se aplicarán promociones automáticas.'
+                                    : [
+                                        promoEnabled      && 'Las promociones activas se aplicarán automáticamente.',
+                                        discItemEnabled   && `El cajero puede descontar hasta un ${discMaxPercent || 100}% por producto.`,
+                                        discGlobalEnabled && `El cajero puede descontar hasta un ${discMaxPercent || 100}% sobre el total.`,
+                                      ].filter(Boolean).join(' ')
+                                }
+                            </span>
+                        </div>
+                    </Card>
+
                     {/* ── Error inline ── */}
                     {errorMsg && (
                         <div className="bs-error-box">
@@ -1025,7 +1096,7 @@ const BusinessSettings = ({ onNavigate }) => {
                 </form>
             </div>
 
-            {/* ── Dialog: éxito al guardar ── */}
+            {/* ── Dialog: éxito ── */}
             {dialog?.type === 'success' && (
                 <div className="bs-dialog-overlay">
                     <div className="bs-dialog" onClick={e => e.stopPropagation()}>

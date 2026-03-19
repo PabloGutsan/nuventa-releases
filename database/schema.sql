@@ -1,6 +1,8 @@
 -- ============================================================================
 -- NUVENTA - ESQUEMA DE BASE DE DATOS
--- SQLite — Versión 2.1 consolidada
+-- SQLite — Versión 2.3 consolidada
+-- Incluye: sistema de promociones (pack_fixed, pack_quantity), descuentos
+--          manuales, settings de control
 -- ============================================================================
 
 -- ============================================================================
@@ -273,11 +275,98 @@ CREATE INDEX IF NOT EXISTS idx_customers_is_active    ON customers(is_active);
 CREATE INDEX IF NOT EXISTS idx_customers_is_company   ON customers(is_company);
 CREATE INDEX IF NOT EXISTS idx_customers_company_name ON customers(company_name);
 
-CREATE TRIGGER IF NOT EXISTS update_customers_timestamp
-AFTER UPDATE ON customers
-BEGIN
-    UPDATE customers SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-END;
+-- ============================================================================
+-- TABLA: promotions   [v2.2]
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS promotions (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    -- Identificación
+    name                    TEXT NOT NULL,
+    description             TEXT,
+
+    -- Tipo de promoción:
+    --   product_discount  → % o monto fijo sobre un producto específico
+    --   category_discount → % sobre todos los productos de una categoría
+    --   pack_fixed        → combo de productos fijos a precio especial
+    --   pack_quantity     → lleva N paga M de una lista o categoría
+    --   minimum_amount    → descuento si el total supera $X
+    type                    TEXT NOT NULL CHECK(type IN (
+                                'product_discount',
+                                'category_discount',
+                                'pack_fixed',
+                                'pack_quantity',
+                                'minimum_amount'
+                            )),
+
+    -- Forma del descuento:
+    --   percentage  → % sobre el precio (discount_value = 0..100)
+    --   fixed       → monto fijo en CLP  (discount_value = monto)
+    --   fixed_price → precio especial fijo (discount_value = precio final)
+    discount_type           TEXT NOT NULL CHECK(discount_type IN (
+                                'percentage',
+                                'fixed',
+                                'fixed_price'
+                            )),
+
+    discount_value          DECIMAL(10,2) NOT NULL DEFAULT 0,
+
+    -- Objetivo (según type)
+    product_id              INTEGER,   -- requerido para product_discount
+    category_id             INTEGER,   -- requerido para category_discount y pack_quantity por categoría
+
+    -- Reglas de pack_quantity (lleva N paga M de una lista o categoría)
+    --   Ejemplo 3x2: pack_buy_quantity=3, pack_pay_quantity=2
+    pack_buy_quantity       INTEGER DEFAULT 1,
+    pack_pay_quantity       INTEGER DEFAULT 1,
+    -- Fuente del pack_quantity: 'category' | 'product_list'
+    pack_quantity_source    TEXT DEFAULT 'product_list',
+    -- Monto mínimo de compra (solo type = 'minimum_amount')
+    minimum_purchase_amount DECIMAL(10,2) DEFAULT 0,
+
+    -- Vigencia (NULL = sin límite de fecha)
+    starts_at               DATETIME,
+    ends_at                 DATETIME,
+
+    -- Estado
+    is_active               BOOLEAN DEFAULT 1,
+
+    -- Auditoría
+    created_by              INTEGER,
+    created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (product_id)  REFERENCES products(id)    ON DELETE SET NULL,
+    FOREIGN KEY (category_id) REFERENCES categories(id)  ON DELETE SET NULL,
+    FOREIGN KEY (created_by)  REFERENCES users(id)       ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotions_type       ON promotions(type);
+CREATE INDEX IF NOT EXISTS idx_promotions_is_active  ON promotions(is_active);
+CREATE INDEX IF NOT EXISTS idx_promotions_product    ON promotions(product_id);
+CREATE INDEX IF NOT EXISTS idx_promotions_category   ON promotions(category_id);
+CREATE INDEX IF NOT EXISTS idx_promotions_starts_at  ON promotions(starts_at);
+CREATE INDEX IF NOT EXISTS idx_promotions_ends_at    ON promotions(ends_at);
+
+-- ============================================================================
+-- TABLA: promotion_products   [v2.3]
+-- Productos que forman parte de un pack o lista de pack_quantity.
+--   pack_fixed    → cada fila es un producto del pack con su cantidad
+--   pack_quantity → cada fila es un producto elegible para el pack
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS promotion_products (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    promotion_id INTEGER NOT NULL,
+    product_id   INTEGER NOT NULL,
+    quantity     INTEGER DEFAULT 1,   -- cantidad requerida (solo pack_fixed)
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id)   REFERENCES products(id)   ON DELETE CASCADE,
+    UNIQUE(promotion_id, product_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotion_products_promo   ON promotion_products(promotion_id);
+CREATE INDEX IF NOT EXISTS idx_promotion_products_product ON promotion_products(product_id);
 
 -- ============================================================================
 -- TABLA: sales
@@ -291,8 +380,10 @@ CREATE TABLE IF NOT EXISTS sales (
     customer_email      TEXT,
     customer_phone      TEXT,
     subtotal            DECIMAL(10,2) NOT NULL,
-    discount            DECIMAL(10,2) DEFAULT 0,
+    discount            DECIMAL(10,2) DEFAULT 0,         -- total descontado (manual + promociones)
     discount_percent    DECIMAL(5,2)  DEFAULT 0,
+    promotion_discount  DECIMAL(10,2) DEFAULT 0,         -- parte automática por promociones
+    manual_discount     DECIMAL(10,2) DEFAULT 0,         -- parte ingresada manualmente por el cajero
     tax                 DECIMAL(10,2) DEFAULT 0,
     total               DECIMAL(10,2) NOT NULL,
     payment_method      TEXT NOT NULL CHECK(payment_method IN ('efectivo','tarjeta_debito','tarjeta_credito','transferencia','multiple')),
@@ -324,28 +415,53 @@ CREATE INDEX IF NOT EXISTS idx_sales_is_cancelled    ON sales(is_cancelled);
 -- TABLA: sale_items
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS sale_items (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    sale_id      INTEGER NOT NULL,
-    product_id   INTEGER NOT NULL,
-    product_name TEXT NOT NULL,
-    product_sku  TEXT,
-    quantity     INTEGER NOT NULL,
-    unit_price   DECIMAL(10,2) NOT NULL,
-    cost_price   DECIMAL(10,2) NOT NULL DEFAULT 0,
-    subtotal     DECIMAL(10,2) NOT NULL,
-    discount     DECIMAL(10,2) DEFAULT 0,
-    tax          DECIMAL(10,2) DEFAULT 0,
-    total        DECIMAL(10,2) NOT NULL,
-    profit       DECIMAL(10,2) GENERATED ALWAYS AS (total - (cost_price * quantity)) STORED,
-    unit_label   TEXT DEFAULT 'un',
-    unit_type    TEXT DEFAULT 'unidad',
-    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sale_id)    REFERENCES sales(id)    ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id)
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id            INTEGER NOT NULL,
+    product_id         INTEGER NOT NULL,
+    product_name       TEXT NOT NULL,
+    product_sku        TEXT,
+    quantity           INTEGER NOT NULL,
+    unit_price         DECIMAL(10,2) NOT NULL,
+    cost_price         DECIMAL(10,2) NOT NULL DEFAULT 0,
+    subtotal           DECIMAL(10,2) NOT NULL,
+    discount           DECIMAL(10,2) DEFAULT 0,          -- total descontado en esta línea
+    promotion_discount DECIMAL(10,2) DEFAULT 0,          -- parte del descuento por promoción
+    manual_discount    DECIMAL(10,2) DEFAULT 0,          -- parte del descuento manual del cajero
+    promotion_id       INTEGER,                          -- FK a la promoción aplicada
+    promotion_name     TEXT,                             -- snapshot del nombre al momento de venta
+    tax                DECIMAL(10,2) DEFAULT 0,
+    total              DECIMAL(10,2) NOT NULL,
+    profit             DECIMAL(10,2) GENERATED ALWAYS AS (total - (cost_price * quantity)) STORED,
+    unit_label         TEXT DEFAULT 'un',
+    unit_type          TEXT DEFAULT 'unidad',
+    created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sale_id)      REFERENCES sales(id)      ON DELETE CASCADE,
+    FOREIGN KEY (product_id)   REFERENCES products(id),
+    FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id    ON sale_items(sale_id);
-CREATE INDEX IF NOT EXISTS idx_sale_items_product_id ON sale_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id      ON sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_product_id   ON sale_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_promotion_id ON sale_items(promotion_id);
+
+-- ============================================================================
+-- TABLA: sale_promotions   [v2.2]
+-- Registro de qué promociones se aplicaron en cada venta.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS sale_promotions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id          INTEGER NOT NULL,
+    promotion_id     INTEGER,                  -- NULL si la promoción fue eliminada después
+    promotion_name   TEXT NOT NULL,            -- snapshot del nombre al momento de la venta
+    promotion_type   TEXT NOT NULL,            -- snapshot del tipo
+    discount_applied DECIMAL(10,2) NOT NULL,   -- monto total descontado por esta promoción
+    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sale_id)      REFERENCES sales(id)      ON DELETE CASCADE,
+    FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sale_promotions_sale      ON sale_promotions(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sale_promotions_promotion ON sale_promotions(promotion_id);
 
 -- ============================================================================
 -- TABLA: cash_registers
@@ -571,6 +687,9 @@ SELECT
     COUNT(*)                   AS total_sales,
     SUM(total)                 AS total_revenue,
     AVG(total)                 AS average_sale,
+    SUM(discount)              AS total_discounts,
+    SUM(promotion_discount)    AS total_promotion_discounts,
+    SUM(manual_discount)       AS total_manual_discounts,
     SUM(CASE WHEN is_cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_sales
 FROM sales
 GROUP BY year, month
@@ -592,6 +711,28 @@ INNER JOIN sales s       ON si.sale_id = s.id
 WHERE s.is_cancelled = 0
 GROUP BY p.id
 ORDER BY total_sold DESC;
+
+-- Vista resumen de promociones   [v2.2]
+CREATE VIEW IF NOT EXISTS promotions_summary AS
+SELECT
+    p.id,
+    p.name,
+    p.type,
+    p.discount_type,
+    p.discount_value,
+    p.is_active,
+    p.starts_at,
+    p.ends_at,
+    COUNT(DISTINCT sp.sale_id)            AS total_sales_applied,
+    COALESCE(SUM(sp.discount_applied), 0) AS total_discount_given,
+    pr.name                               AS product_name,
+    cat.name                              AS category_name
+FROM promotions p
+LEFT JOIN sale_promotions sp ON p.id = sp.promotion_id
+LEFT JOIN products pr        ON p.product_id = pr.id
+LEFT JOIN categories cat     ON p.category_id = cat.id
+GROUP BY p.id
+ORDER BY total_discount_given DESC;
 
 -- ============================================================================
 -- TRIGGERS
@@ -621,6 +762,12 @@ BEGIN
     UPDATE sales SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS update_promotions_timestamp
+AFTER UPDATE ON promotions
+BEGIN
+    UPDATE promotions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS log_inventory_on_product_update
 AFTER UPDATE OF stock ON products
 WHEN NEW.stock != OLD.stock
@@ -639,23 +786,34 @@ END;
 -- ============================================================================
 
 INSERT OR IGNORE INTO system_settings (key, value, description, data_type) VALUES
-('app_version',                   '2.1.0',                'Versión de la aplicación',                               'string'),
-('currency_symbol',               '$',                    'Símbolo de moneda',                                      'string'),
-('tax_rate',                      '19',                   'Tasa de impuesto por defecto (%)',                       'number'),
-('low_stock_alert',               '1',                    'Activar alertas de stock bajo',                          'boolean'),
-('auto_backup',                   '1',                    'Backup automático activado',                             'boolean'),
-('backup_frequency',              '7',                    'Frecuencia de backup en días',                           'number'),
-('printer_name',                  '',                     'Nombre de la impresora por defecto',                     'string'),
-('ticket_footer',                 'Gracias por su compra','Mensaje de pie de ticket',                               'string'),
-('ticket_printer',                '',                     'Impresora de tickets (silenciosa)',                      'string'),
-('kitchen_enabled',               '0',                    'Activar impresión de comanda para cocina',               'boolean'),
-('kitchen_copies',                '1',                    'Cantidad de copias de comanda (1 o 2)',                  'number'),
-('kitchen_printer',               '',                     'Impresora de cocina',                                    'string'),
-('kitchen_copy_dest',             'kitchen',              'Destino de copias de comanda',                           'string'),
-('cash_limit_alert',              '350000',               'Límite de alerta de efectivo en caja',                   'number'),
-('cash_withdrawal_amount',        '300000',               'Monto sugerido de retiro de caja',                       'number'),
-('breakeven_alert',               '1',                    'Alertar cuando ventas no cubren gastos fijos',           'boolean'),
-('fixed_expense_percentage_limit','40',                   'Porcentaje máximo recomendado de gastos fijos / ventas', 'number');
+-- General
+('app_version',                    '2.3.0',                'Versión de la aplicación',                               'string'),
+('currency_symbol',                '$',                    'Símbolo de moneda',                                      'string'),
+('tax_rate',                       '19',                   'Tasa de impuesto por defecto (%)',                       'number'),
+-- Stock
+('low_stock_alert',                '1',                    'Activar alertas de stock bajo',                          'boolean'),
+-- Backup
+('auto_backup',                    '1',                    'Backup automático activado',                             'boolean'),
+('backup_frequency',               '7',                    'Frecuencia de backup en días',                           'number'),
+-- Impresión
+('printer_name',                   '',                     'Nombre de la impresora por defecto',                     'string'),
+('ticket_footer',                  'Gracias por su compra','Mensaje de pie de ticket',                               'string'),
+('ticket_printer',                 '',                     'Impresora de tickets (silenciosa)',                      'string'),
+('kitchen_enabled',                '0',                    'Activar impresión de comanda para cocina',               'boolean'),
+('kitchen_copies',                 '1',                    'Cantidad de copias de comanda (1 o 2)',                  'number'),
+('kitchen_printer',                '',                     'Impresora de cocina',                                    'string'),
+('kitchen_copy_dest',              'kitchen',              'Destino de copias de comanda',                           'string'),
+-- Caja
+('cash_limit_alert',               '350000',               'Límite de alerta de efectivo en caja',                   'number'),
+('cash_withdrawal_amount',         '300000',               'Monto sugerido de retiro de caja',                       'number'),
+-- Gastos
+('breakeven_alert',                '1',                    'Alertar cuando ventas no cubren gastos fijos',           'boolean'),
+('fixed_expense_percentage_limit', '40',                   'Porcentaje máximo recomendado de gastos fijos / ventas', 'number'),
+-- Descuentos y promociones   [v2.2]
+('promotions_enabled',             '1',                    'Activar promociones automáticas en el POS',              'boolean'),
+('discount_manual_item_enabled',   '1',                    'Permitir descuento manual por producto en el carrito',   'boolean'),
+('discount_manual_global_enabled', '1',                    'Permitir descuento global manual en el carrito',         'boolean'),
+('discount_max_percent',           '100',                  'Límite máximo de descuento permitido (%)',               'number');
 
 INSERT OR IGNORE INTO categories (id, name, description, is_active) VALUES
 (1, 'General',          'Categoría general',      1),
@@ -665,5 +823,5 @@ INSERT OR IGNORE INTO categories (id, name, description, is_active) VALUES
 (5, 'Higiene Personal', 'Productos de higiene',   1);
 
 -- ============================================================================
--- FIN DEL ESQUEMA v2.1
+-- FIN DEL ESQUEMA v2.3
 -- ============================================================================

@@ -9,7 +9,7 @@ const Ticket = React.forwardRef(({ sale, businessInfo }, ref) => {
         }).format(value);
 
     const formatQuantity = (item) => {
-        const quantity  = parseFloat(item.quantity) || 0;
+        const quantity = parseFloat(item.quantity) || 0;
         const unitLabel = item.unit_label || 'un';
         if (quantity % 1 !== 0) {
             return `${quantity.toFixed(3).replace(/\.?0+$/, '')} ${unitLabel}`;
@@ -17,26 +17,74 @@ const Ticket = React.forwardRef(({ sale, businessInfo }, ref) => {
         return `${quantity} ${unitLabel}`;
     };
 
-    const formatPaymentMethod = (method) => {
-        const methods = {
-            efectivo:        'Efectivo',
-            tarjeta_debito:  'Tarjeta de Débito',
-            tarjeta_credito: 'Tarjeta de Crédito',
-            transferencia:   'Transferencia',
-            multiple:        'Múltiple',
-        };
-        return methods[method] || method;
+    const formatPaymentMethod = (method) => ({
+        efectivo: 'Efectivo',
+        tarjeta_debito: 'Tarjeta de Débito',
+        tarjeta_credito: 'Tarjeta de Crédito',
+        transferencia: 'Transferencia',
+        multiple: 'Múltiple',
+    }[method] || method);
+
+    const formatDocumentType = (type) => ({
+        boleta_fisica: 'Boleta Física',
+        boleta_electronica: 'Boleta Electrónica',
+        factura_fisica: 'Factura Física',
+        factura_electronica: 'Factura Electrónica',
+        sin_documento: 'Sin Documento',
+    }[type] || type);
+
+    // ── Renderiza el desglose de descuento de un ítem ─────────────────────────
+    const renderItemDiscount = (item) => {
+        const discount = parseFloat(item.discount) || 0;
+        const promoDiscount = parseFloat(item.promotion_discount) || 0;
+        const manualDiscount = parseFloat(item.manual_discount) || 0;
+        const promoUnits = item.promotion_units ? parseInt(item.promotion_units) : null;
+        const quantity = parseFloat(item.quantity) || 0;
+        const unitLabel = item.unit_label || 'un';
+        const promoName = item.promotion_name || null;
+
+        if (discount <= 0) return null;
+
+        return (
+            <div className="ticket-item-discounts">
+
+                {/* Descuento por promoción */}
+                {promoDiscount > 0 && (
+                    <div className="ticket-item-discount ticket-item-discount--promo">
+                        {/* Si solo aplica a algunas unidades, aclararlo */}
+                        {(() => {
+                            const packTimes = item.promotion_pack_times;
+                            if (promoUnits && promoUnits < quantity)
+                                return `${promoName || 'Promo'} (${promoUnits} de ${quantity} ${unitLabel}): -${formatCurrency(promoDiscount)}`;
+                            if (packTimes && packTimes > 1)
+                                return `${promoName || 'Pack'} (${packTimes} packs): -${formatCurrency(promoDiscount)}`;
+                            return `${promoName || 'Promoción'}: -${formatCurrency(promoDiscount)}`;
+                        })()}
+                    </div>
+                )}
+
+                {/* Descuento manual del cajero */}
+                {manualDiscount > 0 && (
+                    <div className="ticket-item-discount">
+                        Dto. manual: -{formatCurrency(manualDiscount)}
+                    </div>
+                )}
+
+                {/* Fallback: descuento sin desglose (ventas antiguas sin los nuevos campos) */}
+                {promoDiscount === 0 && manualDiscount === 0 && discount > 0 && (
+                    <div className="ticket-item-discount">
+                        Descuento: -{formatCurrency(discount)}
+                    </div>
+                )}
+            </div>
+        );
     };
 
-    const formatDocumentType = (type) => {
-        const types = {
-            boleta_fisica:        'Boleta Física',
-            boleta_electronica:   'Boleta Electrónica',
-            factura_fisica:       'Factura Física',
-            factura_electronica:  'Factura Electrónica',
-            sin_documento:        'Sin Documento',
-        };
-        return types[type] || type;
+    // ── Precio original del ítem (sin descuento) ──────────────────────────────
+    const getOriginalTotal = (item) => {
+        const unitPrice = parseFloat(item.unit_price) || 0;
+        const quantity = parseFloat(item.quantity) || 0;
+        return unitPrice * quantity;
     };
 
     return (
@@ -49,10 +97,10 @@ const Ticket = React.forwardRef(({ sale, businessInfo }, ref) => {
                     : <div className="ticket-logo-placeholder"></div>
                 }
                 <h1 className="ticket-business-name">{businessInfo?.name || 'Mi Negocio'}</h1>
-                {businessInfo?.rut     && <p className="ticket-rut">RUT: {businessInfo.rut}</p>}
+                {businessInfo?.rut && <p className="ticket-rut">RUT: {businessInfo.rut}</p>}
                 {businessInfo?.address && <p className="ticket-address">{businessInfo.address}</p>}
-                {businessInfo?.phone   && <p className="ticket-contact">Tel: {businessInfo.phone}</p>}
-                {businessInfo?.email   && <p className="ticket-contact">{businessInfo.email}</p>}
+                {businessInfo?.phone && <p className="ticket-contact">Tel: {businessInfo.phone}</p>}
+                {businessInfo?.email && <p className="ticket-contact">{businessInfo.email}</p>}
             </div>
 
             <hr className="ticket-divider" />
@@ -101,24 +149,33 @@ const Ticket = React.forwardRef(({ sale, businessInfo }, ref) => {
                     <span className="col-total">TOTAL</span>
                 </div>
 
-                {sale.items && sale.items.map((item, index) => (
-                    <div key={index} className="ticket-item">
-                        <div className="ticket-item-name">{item.product_name}</div>
-                        {item.product_sku && (
-                            <div className="ticket-item-sku">SKU: {item.product_sku}</div>
-                        )}
-                        <div className="ticket-item-details">
-                            <span className="col-qty">{formatQuantity(item)}</span>
-                            <span className="col-price">{formatCurrency(item.unit_price)}</span>
-                            <span className="col-total">{formatCurrency(item.total)}</span>
-                        </div>
-                        {item.discount > 0 && (
-                            <div className="ticket-item-discount">
-                                Desc: -{formatCurrency(item.discount)}
+                {sale.items && sale.items.map((item, index) => {
+                    const hasDiscount = parseFloat(item.discount) > 0;
+                    const originalTotal = getOriginalTotal(item);
+
+                    return (
+                        <div key={index} className="ticket-item">
+                            <div className="ticket-item-name">{item.product_name}</div>
+                            {item.product_sku && (
+                                <div className="ticket-item-sku">SKU: {item.product_sku}</div>
+                            )}
+                            <div className="ticket-item-details">
+                                <span className="col-qty">{formatQuantity(item)}</span>
+                                <span className="col-price">{formatCurrency(item.unit_price)}</span>
+                                {/* Si hay descuento, mostrar precio original tachado y precio final */}
+                                {hasDiscount ? (
+                                    <span className="col-total">
+                                        <span className="ticket-original-price">{formatCurrency(originalTotal)}</span>
+                                        {' '}{formatCurrency(item.total)}
+                                    </span>
+                                ) : (
+                                    <span className="col-total">{formatCurrency(item.total)}</span>
+                                )}
                             </div>
-                        )}
-                    </div>
-                ))}
+                            {renderItemDiscount(item)}
+                        </div>
+                    );
+                })}
             </div>
 
             <hr className="ticket-divider" />
@@ -126,13 +183,36 @@ const Ticket = React.forwardRef(({ sale, businessInfo }, ref) => {
             {/* Totales */}
             <div className="ticket-totals">
                 <div className="ticket-total-row">
-                    <span>Subtotal:</span><span>{formatCurrency(sale.subtotal)}</span>
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(sale.subtotal)}</span>
                 </div>
-                {sale.discount > 0 && (
-                    <div className="ticket-total-row ticket-discount">
-                        <span>Descuento:</span><span>-{formatCurrency(sale.discount)}</span>
-                    </div>
+
+                {/* Desglose de descuentos si hay información detallada */}
+                {(parseFloat(sale.promotion_discount) > 0 || parseFloat(sale.manual_discount) > 0) ? (
+                    <>
+                        {parseFloat(sale.promotion_discount) > 0 && (
+                            <div className="ticket-total-row ticket-discount ticket-discount--promo">
+                                <span>Dto. promociones:</span>
+                                <span>-{formatCurrency(sale.promotion_discount)}</span>
+                            </div>
+                        )}
+                        {parseFloat(sale.manual_discount) > 0 && (
+                            <div className="ticket-total-row ticket-discount">
+                                <span>Dto. manual:</span>
+                                <span>-{formatCurrency(sale.manual_discount)}</span>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    /* Fallback para ventas antiguas */
+                    parseFloat(sale.discount) > 0 && (
+                        <div className="ticket-total-row ticket-discount">
+                            <span>Descuento:</span>
+                            <span>-{formatCurrency(sale.discount)}</span>
+                        </div>
+                    )
                 )}
+
                 <div className="ticket-total-row ticket-final">
                     <span>TOTAL:</span><span>{formatCurrency(sale.total)}</span>
                 </div>
@@ -201,10 +281,9 @@ const Ticket = React.forwardRef(({ sale, businessInfo }, ref) => {
                 <p className="ticket-system">NUVENTA.CL</p>
             </div>
 
-            {/* ── Aviso legal — siempre al pie, letra pequeña ── */}
             <hr className="ticket-divider ticket-divider--dashed" />
             <p className="ticket-legal-notice">
-                Este comprobante no es válido 
+                Este comprobante no es válido
                 como boleta o factura.
             </p>
 

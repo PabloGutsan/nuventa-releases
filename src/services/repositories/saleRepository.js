@@ -76,14 +76,15 @@ class SaleRepository {
 
             const localTimestamp = this.getLocalTimestamp();
 
+            // ── INSERT sales — incluye promotion_discount y manual_discount ────
             const saleResult = await window.electronAPI.database.run(`
                 INSERT INTO sales (
                     sale_number, user_id, customer_name, customer_rut, customer_email, customer_phone,
-                    subtotal, discount, discount_percent, tax, total,
+                    subtotal, discount, discount_percent, promotion_discount, manual_discount, tax, total,
                     payment_method, cash_received, cash_change,
                     document_type, document_number, notes,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 saleData.sale_number,
                 saleData.user_id,
@@ -94,6 +95,8 @@ class SaleRepository {
                 parseFloat(saleData.subtotal) || 0,
                 parseFloat(saleData.discount) || 0,
                 parseFloat(saleData.discount_percent) || 0,
+                parseFloat(saleData.promotion_discount) || 0,
+                parseFloat(saleData.manual_discount) || 0,
                 parseFloat(saleData.tax) || 0,
                 parseFloat(saleData.total),
                 saleData.payment_method.trim(),
@@ -139,19 +142,29 @@ class SaleRepository {
                 const itemTax = parseFloat(item.tax) || 0;
                 const itemTotal = parseFloat(item.total);
 
+                // ── INSERT sale_items — incluye campos de descuento y promoción ─
                 await window.electronAPI.database.run(`
                     INSERT INTO sale_items (
                         sale_id, product_id, product_name, product_sku,
                         quantity, unit_label, unit_type,
                         unit_price, cost_price, subtotal,
-                        discount, tax, total,
-                        created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        discount, promotion_discount, manual_discount,
+                      promotion_id, promotion_name, promotion_units, promotion_pack_times,
+                    tax, total,
+                    created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     saleId, item.product_id, item.product_name, item.product_sku || null,
                     itemQuantity, item.unit_label || 'un', item.unit_type || 'unidad',
                     itemUnitPrice, itemCostPrice, itemSubtotal,
-                    itemDiscount, itemTax, itemTotal,
+                    itemDiscount,
+                    parseFloat(item.promotion_discount) || 0,
+                    parseFloat(item.manual_discount) || 0,
+                    item.promotion_id || null,
+                    item.promotion_name || null,
+                    item.promotion_units || null,
+                    item.promotion_pack_times || null,
+                    itemTax, itemTotal,
                     localTimestamp
                 ]);
 
@@ -184,6 +197,29 @@ class SaleRepository {
                 }
             }
 
+            // ── INSERT sale_promotions — registro de qué promos se aplicaron ──
+            if (Array.isArray(saleData.applied_promotions) && saleData.applied_promotions.length > 0) {
+                for (const ap of saleData.applied_promotions) {
+                    try {
+                        await window.electronAPI.database.run(`
+                            INSERT INTO sale_promotions
+                                (sale_id, promotion_id, promotion_name, promotion_type, discount_applied, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        `, [
+                            saleId,
+                            ap.promotion_id || null,
+                            ap.promotion_name || '',
+                            ap.promotion_type || '',
+                            parseFloat(ap.discount_applied) || 0,
+                            localTimestamp
+                        ]);
+                    } catch (err) {
+                        // No bloquear la venta si falla el log de promoción
+                        console.warn('⚠️ No se pudo guardar sale_promotion:', err.message);
+                    }
+                }
+            }
+
             console.log('✅ Venta completada exitosamente con ID:', saleId);
             return {
                 success: true,
@@ -198,7 +234,7 @@ class SaleRepository {
     }
 
     // ============================================================================
-    // Guardar mesa y notas de cocina en una venta existente
+    // Guardar mesa y notas de cocina en una venta existente.
     // Se llama desde PrintModal al momento de imprimir, porque esos campos
     // se rellenan DESPUÉS de que la venta ya fue creada en la BD.
     // No es crítico: si falla el UPDATE, la impresión igual procede.
@@ -207,11 +243,11 @@ class SaleRepository {
         try {
             if (!saleId) return;
             const hasData = (tableInfo && tableInfo.trim()) || (kitchenNotes && kitchenNotes.trim());
-            if (!hasData) return; // no actualizar si ambos están vacíos
+            if (!hasData) return;
             await window.electronAPI.database.run(
                 `UPDATE sales SET table_info = ?, kitchen_notes = ?, updated_at = ? WHERE id = ?`,
                 [
-                    tableInfo    ? tableInfo.trim()    : null,
+                    tableInfo ? tableInfo.trim() : null,
                     kitchenNotes ? kitchenNotes.trim() : null,
                     this.getLocalTimestamp(),
                     saleId
@@ -404,24 +440,28 @@ class SaleRepository {
                     COALESCE(AVG(total), 0) as average_ticket,
                     COALESCE(SUM(subtotal), 0) as total_subtotal,
                     COALESCE(SUM(discount), 0) as total_discount,
+                    COALESCE(SUM(promotion_discount), 0) as total_promotion_discount,
+                    COALESCE(SUM(manual_discount), 0) as total_manual_discount,
                     COALESCE(SUM(tax), 0) as total_tax
                 FROM sales
                 WHERE DATE(created_at) = ? AND is_cancelled = 0
             `, [todayDate]);
             if (!Array.isArray(stats) || stats.length === 0) {
-                return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
+                return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_promotion_discount: 0, total_manual_discount: 0, total_tax: 0 };
             }
             return {
-                total_sales:    parseInt(stats[0].total_sales)    || 0,
-                total_revenue:  parseFloat(stats[0].total_revenue)  || 0,
+                total_sales: parseInt(stats[0].total_sales) || 0,
+                total_revenue: parseFloat(stats[0].total_revenue) || 0,
                 average_ticket: parseFloat(stats[0].average_ticket) || 0,
                 total_subtotal: parseFloat(stats[0].total_subtotal) || 0,
                 total_discount: parseFloat(stats[0].total_discount) || 0,
-                total_tax:      parseFloat(stats[0].total_tax)      || 0,
+                total_promotion_discount: parseFloat(stats[0].total_promotion_discount) || 0,
+                total_manual_discount: parseFloat(stats[0].total_manual_discount) || 0,
+                total_tax: parseFloat(stats[0].total_tax) || 0,
             };
         } catch (error) {
             console.error('Error getting today stats:', error);
-            return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_tax: 0 };
+            return { total_sales: 0, total_revenue: 0, average_ticket: 0, total_subtotal: 0, total_discount: 0, total_promotion_discount: 0, total_manual_discount: 0, total_tax: 0 };
         }
     }
 
@@ -436,6 +476,8 @@ class SaleRepository {
                     COALESCE(SUM(CASE WHEN is_cancelled = 1 THEN total ELSE 0 END), 0) as cancelled_revenue,
                     COALESCE(SUM(subtotal), 0) as total_subtotal,
                     COALESCE(SUM(discount), 0) as total_discount,
+                    COALESCE(SUM(promotion_discount), 0) as total_promotion_discount,
+                    COALESCE(SUM(manual_discount), 0) as total_manual_discount,
                     COALESCE(SUM(tax), 0) as total_tax
                 FROM sales
                 WHERE DATE(created_at) >= DATE(?) AND DATE(created_at) <= DATE(?)
@@ -444,14 +486,16 @@ class SaleRepository {
                 return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0, cancelled_revenue: 0 };
             }
             return {
-                total_sales:       parseInt(results[0].total_sales)       || 0,
-                total_revenue:     parseFloat(results[0].total_revenue)     || 0,
-                average_ticket:    parseFloat(results[0].average_ticket)    || 0,
-                cancelled_sales:   parseInt(results[0].cancelled_sales)     || 0,
+                total_sales: parseInt(results[0].total_sales) || 0,
+                total_revenue: parseFloat(results[0].total_revenue) || 0,
+                average_ticket: parseFloat(results[0].average_ticket) || 0,
+                cancelled_sales: parseInt(results[0].cancelled_sales) || 0,
                 cancelled_revenue: parseFloat(results[0].cancelled_revenue) || 0,
-                total_subtotal:    parseFloat(results[0].total_subtotal)    || 0,
-                total_discount:    parseFloat(results[0].total_discount)    || 0,
-                total_tax:         parseFloat(results[0].total_tax)         || 0,
+                total_subtotal: parseFloat(results[0].total_subtotal) || 0,
+                total_discount: parseFloat(results[0].total_discount) || 0,
+                total_promotion_discount: parseFloat(results[0].total_promotion_discount) || 0,
+                total_manual_discount: parseFloat(results[0].total_manual_discount) || 0,
+                total_tax: parseFloat(results[0].total_tax) || 0,
             };
         } catch (error) {
             console.error('Error getting period stats:', error);
@@ -475,10 +519,10 @@ class SaleRepository {
                 return { total_sales: 0, total_revenue: 0, average_ticket: 0, cancelled_sales: 0 };
             }
             return {
-                total_sales:     parseInt(result[0].total_sales)     || 0,
-                total_revenue:   parseFloat(result[0].total_revenue)   || 0,
-                average_ticket:  parseFloat(result[0].average_ticket)  || 0,
-                cancelled_sales: parseInt(result[0].cancelled_sales)   || 0,
+                total_sales: parseInt(result[0].total_sales) || 0,
+                total_revenue: parseFloat(result[0].total_revenue) || 0,
+                average_ticket: parseFloat(result[0].average_ticket) || 0,
+                cancelled_sales: parseInt(result[0].cancelled_sales) || 0,
             };
         } catch (error) {
             console.error('Error getting user day stats:', error);
@@ -503,9 +547,9 @@ class SaleRepository {
                 const searchTerm = `%${filters.search.trim()}%`;
                 params.push(searchTerm, searchTerm, searchTerm, searchTerm);
             }
-            if (filters.dateFrom)      { sql += ` AND DATE(s.created_at) >= DATE(?)`; params.push(filters.dateFrom); }
-            if (filters.dateTo)        { sql += ` AND DATE(s.created_at) <= DATE(?)`; params.push(filters.dateTo); }
-            if (filters.userId)        { sql += ` AND s.user_id = ?`; params.push(filters.userId); }
+            if (filters.dateFrom) { sql += ` AND DATE(s.created_at) >= DATE(?)`; params.push(filters.dateFrom); }
+            if (filters.dateTo) { sql += ` AND DATE(s.created_at) <= DATE(?)`; params.push(filters.dateTo); }
+            if (filters.userId) { sql += ` AND s.user_id = ?`; params.push(filters.userId); }
             if (filters.paymentMethod && filters.paymentMethod.trim()) {
                 sql += ` AND s.payment_method = ?`; params.push(filters.paymentMethod.trim());
             }

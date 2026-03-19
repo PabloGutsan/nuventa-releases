@@ -191,3 +191,41 @@
     line-height: 1.4;
     font-style: italic;
 }
+
+
+/* Contenedor de descuentos de un ítem */
+.ticket-item-discounts {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+ 
+/* Descuento de promoción/pack — en rojo itálico igual que antes */
+.ticket-item-discount--promo {
+    font-style: italic;
+    color: #cc0000;
+    font-size: 0.85em;
+    text-align: right;
+}
+
+
+/* Precio original tachado cuando hay descuento */
+.ticket-original-price {
+    text-decoration: line-through;
+    color: #9ca3af;
+    font-size: 0.85em;
+    margin-right: 4px;
+}
+ 
+/* Línea de descuento por promoción — en rojo cursiva (como en el diseño actual) */
+.ticket-item-discount--promo {
+    color: #dc2626;
+    font-style: italic;
+}
+ 
+/* Descuento de promoción en totales */
+.ticket-discount--promo {
+    color: #dc2626;
+    font-style: italic;
+}
+ 
