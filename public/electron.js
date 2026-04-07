@@ -8,7 +8,6 @@ const Store = require('electron-store');
 const {
     activateLicense,
     checkLicense,
-    checkLocalLicense,
     clearLocalLicense
 } = require('./licenseManager');
 
@@ -18,7 +17,6 @@ const runMigrations = require('../database/migrations');
 // Versión de migración que corresponde al schema.sql actual (v2.3).
 // Al instalar por primera vez se estampa este número para que las migraciones
 // futuras sepan que este usuario ya tiene el schema completo.
-const CURRENT_SCHEMA_MIGRATION = 3;
 
 let mainWindow;
 let db;
@@ -257,12 +255,15 @@ function initDatabase() {
         //   runMigrations aplica solo las migraciones que faltan.
         const userVersion = db.pragma('user_version')[0]?.user_version ?? 0;
 
-        if (userVersion === 0) {
-            // Primer arranque en este equipo — BD recién creada desde schema.sql
-            db.pragma(`user_version = ${CURRENT_SCHEMA_MIGRATION}`);
-            console.log(`✅ Nueva instalación — BD estampada en versión ${CURRENT_SCHEMA_MIGRATION}`);
+         if (userVersion === 0) {
+            // user_version = 0 puede ser instalacion nueva O usuario antiguo
+            // pre-migraciones. Corremos migraciones en ambos casos — son
+            // seguras con IF NOT EXISTS y la migracion 4 repara columnas
+            // faltantes sin tocar datos existentes.
+            console.log('[DB] Corriendo migraciones (instalacion nueva o usuario pre-migraciones)...');
+            runMigrations(db);
         } else {
-            // Usuario existente — aplicar migraciones pendientes si las hay
+            // Usuario existente con migraciones previas — aplicar las que faltan
             runMigrations(db);
         }
 
