@@ -2,7 +2,6 @@
 // ============================================================================
 //
 //  SISTEMA DE MIGRACIONES — Nuventa POS
-//  ─────────────────────────────────────────────────────────────────────────
 //  Usa PRAGMA user_version (integer nativo de SQLite, siempre disponible).
 //
 // ============================================================================
@@ -104,31 +103,36 @@ const MIGRATIONS = [
     },
 
     // ══════════════════════════════════════════════════════════════════════════
-    // MIGRACIÓN 4 — Reparacion usuarios pre-migraciones v1.0.3
+    // MIGRACIÓN 4 — Reparacion usuarios pre-migraciones v1.0.4
     //
-    // PROBLEMA: Usuarios con la app instalada ANTES del sistema de migraciones
-    // tenian user_version = 0. electron.js los trataba como instalacion nueva
-    // y estampaba user_version = 3 SIN correr migraciones 1, 2 y 3.
-    // Resultado: faltaban todas las columnas de promociones en sale_items,
-    // causando el error: "table sale_items has no column named promotion_units"
-    //
-    // SOLUCION: Re-aplica todas las columnas con IF NOT EXISTS.
-    // Si ya existen no hace nada. Si faltan las agrega. 100% segura.
+    // PROBLEMA ANTERIOR: SQLite < 3.37 no soporta ALTER TABLE ADD COLUMN IF NOT EXISTS
+    // SOLUCION: usar try/catch por cada columna — si falla con 'duplicate column name'
+    // significa que ya existe y se ignora. Cualquier otro error se relanza.
+    // CREATE TABLE IF NOT EXISTS si es compatible con versiones antiguas de SQLite.
     // ══════════════════════════════════════════════════════════════════════════
     {
         version:    4,
-        appVersion: '1.0.3',
-        description: 'Reparacion columnas faltantes en usuarios pre-migraciones',
+        appVersion: '1.0.4',
+        description: 'Reparacion columnas faltantes — compatible SQLite antiguo',
         up(db) {
-            // Re-aplicar migracion 1
-            db.exec(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS table_info TEXT`);
-            db.exec(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS kitchen_notes TEXT`);
-            db.exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS unlimited_stock INTEGER NOT NULL DEFAULT 0`);
-            db.exec(`ALTER TABLE business_info ADD COLUMN IF NOT EXISTS region TEXT`);
-            db.exec(`ALTER TABLE business_info ADD COLUMN IF NOT EXISTS city TEXT`);
-            db.exec(`ALTER TABLE products ADD COLUMN IF NOT EXISTS allow_negative_stock INTEGER NOT NULL DEFAULT 0`);
+            // Helper compatible con SQLite antiguo (sin IF NOT EXISTS en ALTER TABLE)
+            function addCol(table, col, def) {
+                try {
+                    db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+                } catch (e) {
+                    if (!e.message.includes('duplicate column name')) throw e;
+                }
+            }
 
-            // Re-aplicar migracion 2
+            // ── Re-aplicar migración 1 ────────────────────────────────────────
+            addCol('sales',         'table_info',           'TEXT');
+            addCol('sales',         'kitchen_notes',        'TEXT');
+            addCol('products',      'unlimited_stock',      'INTEGER NOT NULL DEFAULT 0');
+            addCol('business_info', 'region',               'TEXT');
+            addCol('business_info', 'city',                 'TEXT');
+            addCol('products',      'allow_negative_stock', 'INTEGER NOT NULL DEFAULT 0');
+
+            // ── Re-aplicar migración 2 — tablas (CREATE IF NOT EXISTS es seguro) ──
             db.exec(`
                 CREATE TABLE IF NOT EXISTS promotions (
                     id                       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,13 +172,16 @@ const MIGRATIONS = [
                 CREATE INDEX IF NOT EXISTS idx_promotion_products_promo  ON promotion_products(promotion_id);
                 CREATE INDEX IF NOT EXISTS idx_sale_promotions_sale      ON sale_promotions(sale_id);
             `);
-            db.exec(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS applied_promotions TEXT`);
-            db.exec(`ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS manual_discount      INTEGER NOT NULL DEFAULT 0`);
-            db.exec(`ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS promotion_discount   INTEGER NOT NULL DEFAULT 0`);
-            db.exec(`ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS promotion_id         INTEGER`);
-            db.exec(`ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS promotion_name       TEXT`);
-            db.exec(`ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS promotion_units      REAL`);
-            db.exec(`ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS promotion_pack_times INTEGER`);
+
+            // ── Re-aplicar migración 2 — columnas ────────────────────────────
+            addCol('sales',      'applied_promotions',   'TEXT');
+            addCol('sale_items', 'manual_discount',      'INTEGER NOT NULL DEFAULT 0');
+            addCol('sale_items', 'promotion_discount',   'INTEGER NOT NULL DEFAULT 0');
+            addCol('sale_items', 'promotion_id',         'INTEGER');
+            addCol('sale_items', 'promotion_name',       'TEXT');
+            addCol('sale_items', 'promotion_units',      'REAL');
+            addCol('sale_items', 'promotion_pack_times', 'INTEGER');
+
             db.exec(`
                 INSERT OR IGNORE INTO system_settings (key, value) VALUES
                     ('promotions_enabled',             '1'),
@@ -183,9 +190,9 @@ const MIGRATIONS = [
                     ('discount_max_percent',           '100');
             `);
 
-            // Re-aplicar migracion 3
-            db.exec(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS promotion_discount INTEGER NOT NULL DEFAULT 0`);
-            db.exec(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS manual_discount    INTEGER NOT NULL DEFAULT 0`);
+            // ── Re-aplicar migración 3 ────────────────────────────────────────
+            addCol('sales', 'promotion_discount', 'INTEGER NOT NULL DEFAULT 0');
+            addCol('sales', 'manual_discount',    'INTEGER NOT NULL DEFAULT 0');
         },
     },
 
